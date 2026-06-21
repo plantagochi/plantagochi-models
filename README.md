@@ -1,4 +1,4 @@
-# planta-gochi-models
+# plantagochi-models
 
 식물 이미지에서 잎의 갯수와 면적을 분석하는 라이브러리입니다.
 
