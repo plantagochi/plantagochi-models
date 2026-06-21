@@ -7,11 +7,8 @@ from __future__ import annotations
 import numpy as np
 from pathlib import Path
 
-CONF_THRESHOLD = 0.25
-MASK_THRESHOLD = 0.5
 INPUT_SIZE = 640
 
-#preprocess backend 1(faster)
 def _preprocess(image: np.ndarray) -> tuple[np.ndarray, int, int]:
     """
     Resize and normalize image to model input.
@@ -27,7 +24,7 @@ def _preprocess(image: np.ndarray) -> tuple[np.ndarray, int, int]:
     blob = np.expand_dims(blob, axis=0)                # CHW → BCHW
     return blob, orig_h, orig_w
 
-#preprocess backend 2(safe)
+
 def _preprocess_pil(image: np.ndarray) -> tuple[np.ndarray, int, int]:
     """PIL-based resize fallback (no cv2 needed)."""
     from PIL import Image as PILImage
@@ -51,6 +48,8 @@ def _postprocess(
     protos: np.ndarray,      # (1, 32, 160, 160)
     orig_h: int,
     orig_w: int,
+    conf_threshold: float,
+    mask_threshold: float
 ) -> dict:
     """
     Parse YOLOv8-seg outputs into leaf count and areas.
@@ -63,35 +62,32 @@ def _postprocess(
     conf = pred[4]           # (8400,)
     mask_coefs = pred[5:]    # (32, 8400)
 
-    keep = conf > CONF_THRESHOLD
+    keep = conf > conf_threshold
     if not keep.any():
         return _empty_result()
 
     conf_keep = conf[keep]
     coefs_keep = mask_coefs[:, keep].T   # (N, 32)
 
-    # Compute masks: (N, 160*160)
+    # Compute masks at 160x160
     proto_flat = proto.reshape(32, -1)                       # (32, 160*160)
     masks_flat = 1 / (1 + np.exp(-(coefs_keep @ proto_flat)))  # sigmoid, (N, 160*160)
     masks = masks_flat.reshape(-1, 160, 160)                 # (N, 160, 160)
 
-    # Upscale masks to original image size using nearest-neighbour
-    scale_h = orig_h / 160
-    scale_w = orig_w / 160
-    yi = (np.arange(orig_h) / scale_h).astype(int).clip(0, 159)
-    xi = (np.arange(orig_w) / scale_w).astype(int).clip(0, 159)
-    masks_full = masks[:, yi][:, :, xi]  # (N, orig_h, orig_w)
+    # Dedup at 160x160 BEFORE upscaling (massive speedup for large images)
+    binary_small = masks > mask_threshold                    # (N, 160, 160)
+    binary_small = _soft_dedup(binary_small, conf_keep)
 
-    binary = masks_full > MASK_THRESHOLD  # (N, orig_h, orig_w)
+    # 160x160에서 바로 면적 계산 후 스케일링 (upscale 불필요)
+    scale = (orig_h * orig_w) / (160 * 160)
+    counts_small = binary_small.sum(axis=(1, 2))             # (N,) int
+    pixel_areas = [int(round(c * scale)) for c in counts_small]
+    #total_pixels = orig_h * orig_w
+    ratio_areas = [round(c / (160 * 160), 6) for c in counts_small.tolist()]
 
-    # NMS-lite: remove masks that are >80% overlapping with a higher-conf mask
-    binary = _soft_dedup(binary, conf_keep)
+    union_small = np.any(binary_small, axis=0)
+    total_px = int(round(union_small.sum() * scale))
 
-    total_pixels = orig_h * orig_w
-    pixel_areas = [int(m.sum()) for m in binary]
-    ratio_areas = [round(p / total_pixels, 6) for p in pixel_areas]
-
-    total_px = sum(pixel_areas)
     return {
         "leaf_count": len(pixel_areas),
         "leaf_areas": {
@@ -100,7 +96,7 @@ def _postprocess(
         },
         "total_area": {
             "pixels": total_px,
-            "ratio": round(total_px / total_pixels, 6),
+            "ratio": round(union_small.sum() / (160 * 160), 6),
         },
     }
 
@@ -138,19 +134,21 @@ def _empty_result() -> dict:
 # ---------------------------------------------------------------------------
 
 class OnnxBackend:
-    def __init__(self, model_path: Path):
+    def __init__(self, model_path: Path, conf: float, mask: float):
         import onnxruntime as ort
         self._session = ort.InferenceSession(
             str(model_path),
             providers=["CPUExecutionProvider"],
         )
         self._input_name = self._session.get_inputs()[0].name
+        self.conf = conf
+        self.mask = mask
 
     def run(self, image: np.ndarray) -> dict:
         blob, orig_h, orig_w = _safe_preprocess(image)
         outputs = self._session.run(None, {self._input_name: blob})
         preds, protos = outputs[0], outputs[1]
-        return _postprocess(preds, protos, orig_h, orig_w)
+        return _postprocess(preds, protos, orig_h, orig_w, self.conf, self.mask)
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +156,7 @@ class OnnxBackend:
 # ---------------------------------------------------------------------------
 
 class TFLiteBackend:
-    def __init__(self, model_path: Path):
+    def __init__(self, model_path: Path, conf: float, mask: float):
         try:
             from ai_edge_litert.interpreter import Interpreter
         except ImportError:
@@ -173,6 +171,8 @@ class TFLiteBackend:
         self._interp.allocate_tensors()
         self._input_idx = self._interp.get_input_details()[0]["index"]
         self._output_details = self._interp.get_output_details()
+        self.conf = conf
+        self.mask = mask
 
     def run(self, image: np.ndarray) -> dict:
         blob, orig_h, orig_w = _safe_preprocess(image)
@@ -189,4 +189,4 @@ class TFLiteBackend:
             protos = np.transpose(protos_raw, (0, 3, 1, 2))
         else:
             protos = protos_raw
-        return _postprocess(preds, protos, orig_h, orig_w)
+        return _postprocess(preds, protos, orig_h, orig_w, self.conf, self.mask)

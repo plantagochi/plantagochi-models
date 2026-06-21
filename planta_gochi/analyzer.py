@@ -27,6 +27,10 @@ class LeafAnalyzer:
         'onnx' (default) or 'tflite'
     model_path : str or Path, optional
         Custom model file path. Uses bundled model if not specified.
+    conf_threshold : float
+        Only masks over conf_threshold will be treated as detection output.
+    mask_threshold : float
+        Only pixels over probability maks_threshold will be treated as part of the mask.
 
     Examples
     --------
@@ -40,19 +44,23 @@ class LeafAnalyzer:
         self,
         backend: str = "onnx",
         model_path: Union[str, Path, None] = None,
+        conf_threshold: float = 0.25,
+        mask_threshold: float = 0.5
     ):
         backend = backend.lower()
         if backend == "onnx":
             path = Path(model_path) if model_path else _DEFAULT_ONNX
-            self._backend = OnnxBackend(path)
+            self._backend = OnnxBackend(path, conf_threshold, mask_threshold)
         elif backend == "tflite":
             path = Path(model_path) if model_path else _DEFAULT_TFLITE
-            self._backend = TFLiteBackend(path)
+            self._backend = TFLiteBackend(path, conf_threshold, mask_threshold)
         elif backend == "tflite16":
             path = Path(model_path) if model_path else _DEFAULT_TFLITE16
-            self._backend = TFLiteBackend(path)
+            self._backend = TFLiteBackend(path, conf_threshold, mask_threshold)
         else:
             raise ValueError(f"Unknown backend '{backend}'. Choose 'onnx' or 'tflite'.")
+        self.conf_threshold = conf_threshold
+        self.mask_threshold = mask_threshold
 
     def analyze(self, image: ImageInput) -> dict:
         """
