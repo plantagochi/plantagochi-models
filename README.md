@@ -5,7 +5,7 @@
 ## 설치
 
 ```bash
-pip install git+https://github.com/your-org/planta-gochi-models.git
+pip install git+https://github.com/plantagochi/plantagochi-models.git
 ```
 
 ## 사용법
