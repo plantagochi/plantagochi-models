@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-analyzer = LeafAnalyzer("onnx")
+analyzer = LeafAnalyzer("tflite")
 
 for name in ["sample_easy.jpg", "sample_hard.jpg"]:
     start = time.perf_counter()
