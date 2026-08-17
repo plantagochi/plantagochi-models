@@ -146,6 +146,84 @@
         "C_HIGH_TO_MID": "이제야 좀 촉촉해졌어요, 정말 다행이에요",
         "C_HIGH_TO_HIGH": "조금 촉촉해졌어요, 그래도 아직 눅눅해요"
       }
+    },
+    "growth": {
+      "type": "growth",
+      "leaf_analyzer": {
+        "backend": "onnx"
+      },
+      "count_machine": {
+        "confirm_streak": 3,
+        "state_prompts": {
+          "STABLE": "현재 잎이 {count}개로 유지되고 있음"
+        },
+        "event_prompts": {
+          "NO_EVENTS": "잎 개수에 특별한 변화가 없음",
+          "INCREASED": "새 잎이 돋아나 잎이 {count}개로 늘어남",
+          "DECREASED": "잎이 떨어져 잎이 {count}개로 줄어듦"
+        },
+        "default_dialog": {
+          "STABLE": "지금 잎이 {count}장이에요",
+          "NO_EVENTS": "잎 개수는 그대로예요",
+          "INCREASED": "짜잔, 새 잎이 나서 이제 {count}장이 됐어요!",
+          "DECREASED": "잎이 하나 떨어져서 이제 {count}장이에요..."
+        }
+      },
+      "trend_machine": {
+        "window": 7,
+        "mad_k": 3.5,
+        "growth_eps": 0.001,
+        "decline_eps": 0.001,
+        "state_prompts": {
+          "INSUFFICIENT_DATA": "아직 추세를 판단하기엔 데이터가 부족함",
+          "DECLINING": "크기가 점점 줄어들고 있어 걱정됨",
+          "STAGNANT": "크기에 뚜렷한 변화가 없어 담담함",
+          "GROWING": "크기가 꾸준히 자라고 있어 뿌듯함"
+        },
+        "event_prompts": {
+          "NO_EVENTS": "추세에 특별한 변화가 없음",
+
+          "INSUFFICIENT_TO_DECLINING": "데이터가 쌓이자마자 줄어드는 추세가 보여 걱정스러움",
+          "INSUFFICIENT_TO_STAGNANT": "데이터가 쌓이자 별다른 변화가 없는 추세로 확인됨",
+          "INSUFFICIENT_TO_GROWING": "데이터가 쌓이자마자 자라는 추세가 보여 기대됨",
+
+          "DECLINING_TO_INSUFFICIENT": "판단 기준이 흔들려 추세를 다시 지켜보는 중",
+          "DECLINING_TO_STAGNANT": "줄어들던 추세가 멈춰서 한숨 돌림",
+          "DECLINING_TO_GROWING": "줄어들던 추세가 자라는 추세로 완전히 반전되어 놀랍고 기쁨",
+
+          "STAGNANT_TO_INSUFFICIENT": "판단 기준이 흔들려 추세를 다시 지켜보는 중",
+          "STAGNANT_TO_DECLINING": "멈춰 있던 크기가 줄어들기 시작해 걱정됨",
+          "STAGNANT_TO_GROWING": "멈춰 있던 크기가 다시 자라기 시작해 기쁨",
+
+          "GROWING_TO_INSUFFICIENT": "판단 기준이 흔들려 추세를 다시 지켜보는 중",
+          "GROWING_TO_DECLINING": "자라던 추세가 줄어드는 추세로 완전히 반전되어 놀랍고 걱정됨",
+          "GROWING_TO_STAGNANT": "자라던 기세가 멈춰서 아쉬움"
+        },
+        "default_dialog": {
+          "INSUFFICIENT_DATA": "아직 잘 모르겠어요, 조금만 더 지켜봐 주세요",
+          "DECLINING": "요즘 점점 작아지는 것 같아요... 걱정돼요",
+          "STAGNANT": "요즘 크기는 그대로예요, 평온해요",
+          "GROWING": "요즘 쑥쑥 자라고 있어요! 기분이 좋아요",
+
+          "NO_EVENTS": "특별히 달라진 건 없어요",
+
+          "INSUFFICIENT_TO_DECLINING": "어? 지켜보니 점점 작아지고 있었나 봐요, 걱정돼요",
+          "INSUFFICIENT_TO_STAGNANT": "이제 좀 알겠어요, 크기가 그대로 유지되고 있었네요",
+          "INSUFFICIENT_TO_GROWING": "이제 알겠어요, 저 꾸준히 자라고 있었어요!",
+
+          "DECLINING_TO_INSUFFICIENT": "음... 다시 지켜봐야 할 것 같아요",
+          "DECLINING_TO_STAGNANT": "다행히 더 작아지진 않아요, 이제 안심이에요",
+          "DECLINING_TO_GROWING": "작아지다가 다시 자라기 시작했어요! 정말 다행이에요",
+
+          "STAGNANT_TO_INSUFFICIENT": "음... 다시 지켜봐야 할 것 같아요",
+          "STAGNANT_TO_DECLINING": "어, 그대로였는데 점점 작아지기 시작했어요, 걱정돼요",
+          "STAGNANT_TO_GROWING": "가만히 있다가 다시 자라기 시작했어요! 신나요",
+
+          "GROWING_TO_INSUFFICIENT": "음... 다시 지켜봐야 할 것 같아요",
+          "GROWING_TO_DECLINING": "쑥쑥 자라다가 갑자기 작아지기 시작했어요, 무슨 일이죠?",
+          "GROWING_TO_STAGNANT": "자라던 게 잠깐 멈췄어요, 조금 아쉬워요"
+        }
+      }
     }
   }
 }

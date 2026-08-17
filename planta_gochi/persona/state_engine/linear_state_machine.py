@@ -50,8 +50,8 @@ class LinearStateMachine(StateEngine):
         state_prompt = self.state_prompts[state]
         
         result = {
-            "prompt": event_prompt if is_there_a_event else state_prompt,
-            "default_dialog": self.default_dialog[event if is_there_a_event else state],
+            "prompt": [event_prompt if is_there_a_event else state_prompt],
+            "default_dialog": [self.default_dialog[event if is_there_a_event else state]],
             "is_there_a_event": is_there_a_event,
             "event_prompt": event_prompt,
             "state_prompt": state_prompt,

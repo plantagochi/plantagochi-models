@@ -8,9 +8,9 @@ from typing import Union
 
 import numpy as np
 
-from planta_gochi._inference import OnnxBackend, TFLiteBackend
+from planta_gochi.sensory._inference import OnnxBackend, TFLiteBackend
 
-_ASSETS = Path(__file__).parent.parent / "assets"
+_ASSETS = Path(__file__).parent / "assets"
 _DEFAULT_ONNX = _ASSETS / "best.onnx"
 _DEFAULT_TFLITE = _ASSETS / "best_float32.tflite"
 _DEFAULT_TFLITE16 = _ASSETS / "best_float16.tflite"
