@@ -6,7 +6,8 @@ Persona는 온도/습도/growth처럼 여러 dimension을 동시에 들고 있�
 따로 요청을 보내면(N개 dimension = N번 request) 레이턴시 병목이 심해진다. 그래서
 OpenRouter의 tools(function calling) 필드로 "센서 이름 -> 짧은 대사" 스키마를 동적으로
 만들어 한 번의 요청에 실어 보내고, 모델이 tool call로 구조화된 응답을 한 번에 돌려주게
-한다.
+한다. 스키마 조립/응답 파싱 로직은 다른 백엔드(예: ollama_connection.py)와
+tool_schema.py를 공유한다.
 
 키가 없거나, timeout이 나거나, 접근이 안 되거나, tool call 응답 파싱에 실패하는 등
 어떤 이유로든 실패하면 예외를 던지지 않고 실패한 부분만큼만 비워서 돌려준다(전체 요청
@@ -23,9 +24,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
-def _warn(message: str) -> None:
-    print(f"[LLMConnection] {message}", file=sys.stderr)
+from planta_gochi.llm import tool_schema
 
 OPENROUTER_AI_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -36,9 +35,11 @@ DEFAULT_TIMEOUT = 10  # seconds
 DEFAULT_TEMPERATURE = 0.8
 DEFAULT_MAX_TOKENS = 300
 
-_TOOL_NAME = "generate_persona_output"
-
 _ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
+
+
+def _warn(message: str) -> None:
+    print(f"[LLMConnection] {message}", file=sys.stderr)
 
 
 def _load_env_file(path: Path) -> dict:
@@ -61,36 +62,6 @@ _DOTENV = _load_env_file(_ENV_PATH)
 def _dotenv_get(key: str) -> Optional[str]:
     # 실제 환경변수가 이미 설정되어 있으면 그것을 우선한다.
     return os.environ.get(key) or _DOTENV.get(key) or None
-
-
-def _build_tool_schema(keys: List[str], species: str) -> dict:
-    """situations의 키(센서 이름)마다 문자열 하나씩 요구하는 함수 스키마를 동적으로 만든다."""
-    properties = {
-        key: {
-            "type": "string",
-            "description": f'"{key}" 상태를 반영한 "{species}"의 짧은 대사 (30자 이내)',
-        }
-        for key in keys
-    }
-    return {
-        "type": "function",
-        "function": {
-            "name": _TOOL_NAME,
-            "description": f'"{species}" 페르소나가 현재 상태들을 반영해 센서별로 짧은 대사를 생성',
-            "parameters": {
-                "type": "object",
-                "properties": properties,
-                "required": list(keys),
-            },
-        },
-    }
-
-
-def _render_context(species: str, situations: Dict[str, List[str]]) -> str:
-    lines = [f'식물 종: "{species}"', ""]
-    for key, messages in situations.items():
-        lines.append(f"[{key}] " + " / ".join(messages))
-    return "\n".join(lines)
 
 
 class LLMConnection:
@@ -130,19 +101,15 @@ class LLMConnection:
             return None
 
         keys = list(situations.keys())
-        system_content = (
-            f'당신은 식물 "{species}"의 페르소나입니다. 주어진 각 상태에 대해, 그 식물이 '
-            "할 법한 짧은 대사를 30자 이내로 만들어 generate_persona_output 함수를 호출해 응답하세요."
-        )
 
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": system_content},
-                {"role": "user", "content": _render_context(species, situations)},
+                {"role": "system", "content": tool_schema.system_prompt(species)},
+                {"role": "user", "content": tool_schema.render_context(species, situations)},
             ],
-            "tools": [_build_tool_schema(keys, species)],
-            "tool_choice": {"type": "function", "function": {"name": _TOOL_NAME}},
+            "tools": [tool_schema.build_tool_schema(keys, species)],
+            "tool_choice": {"type": "function", "function": {"name": tool_schema.TOOL_NAME}},
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
         }
@@ -171,13 +138,4 @@ class LLMConnection:
             _warn(f"응답 파싱 실패(model={self.model!r}): {e!r}. 전부 default_dialog로 대체됩니다.")
             return None
 
-        if not isinstance(arguments, dict):
-            _warn(f"tool call arguments가 dict가 아닙니다: {arguments!r}. 전부 default_dialog로 대체됩니다.")
-            return None
-
-        result = {key: str(arguments[key]) for key in keys if key in arguments}
-        missing = [key for key in keys if key not in arguments]
-        if missing:
-            _warn(f"응답에 없는 키 {missing}는 default_dialog로 대체됩니다(나머지는 LLM 응답 사용).")
-
-        return result
+        return tool_schema.extract_partial_result(keys, arguments, _warn)

@@ -95,3 +95,45 @@ ai = PlantAI(persona, llm=LLMConnection(
 않는 모델로 연결될 수 있어 권장하지 않습니다.
 
 실행 예시는 [`main.py`](../main.py)를 참고하세요.
+
+## 로컬 Ollama로 대체하기 (개발 환경 전용)
+
+OpenRouter 없이 로컬 Ollama 서버로 같은 걸 해보고 싶으면 `LLMConnection` 대신
+`OllamaConnection`을 꽂으면 됩니다. `ask_batch()` 계약이 완전히 동일해서 `PlantAI`
+쪽 코드는 바뀔 게 없습니다.
+
+```python
+from planta_gochi.persona.sheets import build_known_persona
+from planta_gochi.plant_ai import PlantAI
+from planta_gochi.llm.ollama_connection import OllamaConnection
+
+persona = build_known_persona("상추")
+ai = PlantAI(persona, llm=OllamaConnection(
+    model="qwen2.5:32b",              # 로컬에 pull되어 있고 tools를 지원하는 모델
+    host="http://localhost:11434",     # 기본값. 다른 머신/포트면 바꾸면 됨
+))
+
+messages = ai.speak({"temperature": 20, "humidity": 60})
+```
+
+**설치**: `ollama` 파이썬 패키지는 기본 설치(`pip install plantagochi-models`)에 포함되지
+않습니다. 로컬 개발 환경에서만 다음처럼 따로 설치하세요.
+
+```bash
+pip install "plantagochi-models[ollama]"
+# 또는 uv를 쓴다면
+uv sync --extra ollama
+```
+
+`ollama` 패키지가 없는 상태에서 `from planta_gochi.llm.ollama_connection import
+OllamaConnection`을 import하는 것 자체는 문제없이 되고, 실제로 `OllamaConnection(...)`을
+생성하는 시점에만 설치 방법을 안내하는 `ImportError`가 납니다.
+
+**주의할 점**: 로컬 모델의 tool-calling 신뢰도는 모델마다 편차가 큽니다.
+- 일부 모델은 `tool_calls` 없이 답변 텍스트에 JSON을 그대로 흉내 내어 쓰는데,
+  `OllamaConnection`은 이 경우도 최대한 파싱을 시도합니다.
+- 스키마가 복잡해지면(센서가 많아지면) 아예 엉뚱한 인자를 만들어내는 모델도 있습니다 —
+  이 경우 `[OllamaConnection] 응답에 없는 키 [...] 는 default_dialog로 대체됩니다`
+  경고가 뜨고 해당 센서만 fallback 처리됩니다(다른 백엔드와 동일한 부분 성공 규칙).
+- Ollama 서버가 꺼져 있거나 모델이 pull되어 있지 않으면 요청 자체가 실패로 잡혀
+  경고가 뜨고 전부 fallback됩니다.

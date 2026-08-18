@@ -18,6 +18,11 @@ dependencies = [
 full = [
     "tflite_runtime"
 ]
+# 개발 환경에서 로컬 Ollama로 프롬프트를 생성하고 싶을 때만 설치.
+# 기본 설치(pip install plantagochi-models)에는 포함되지 않는다.
+ollama = [
+    "ollama"
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["planta_gochi"]
