@@ -9,17 +9,23 @@ OpenRouter의 tools(function calling) 필드로 "센서 이름 -> 짧은 대사"
 한다.
 
 키가 없거나, timeout이 나거나, 접근이 안 되거나, tool call 응답 파싱에 실패하는 등
-어떤 이유로든 실패하면 예외를 던지지 않고 None을 돌려준다. 실패 시 default_dialog로
-대체하는 것은 호출부(PlantAI)의 몫이다.
+어떤 이유로든 실패하면 예외를 던지지 않고 실패한 부분만큼만 비워서 돌려준다(전체 요청
+자체가 아예 안 됐으면 None). 어느 부분이 왜 실패했는지는 stderr에 경고로 남기되,
+반환값 자체에는 영향을 주지 않는다. default_dialog로 대체하는 것은 호출부(PlantAI)의 몫.
 
 외부 HTTP 라이브러리(requests 등) 없이 표준 라이브러리 urllib만 사용한다.
 """
 
 import json
 import os
+import sys
 import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional
+
+
+def _warn(message: str) -> None:
+    print(f"[LLMConnection] {message}", file=sys.stderr)
 
 OPENROUTER_AI_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -92,14 +98,11 @@ class LLMConnection:
     species(식물 종 이름)와 situations({센서 이름: 상황 설명 목록})를 받아 OpenRouter LLM에게
     센서별 짧은 대사를 "한 번의 tool-calling 요청"으로 받아오는 클래스.
 
-    ask_batch()는 성공하면 {센서 이름: 대사} dict(situations의 모든 키를 포함), 실패하면
-    None을 돌려준다. None을 돌려주는 경우:
-    - API 키가 없을 때
-    - 네트워크 오류/timeout이 났을 때
-    - 모델이 tool call을 하지 않았거나, 응답이 JSON으로 파싱되지 않거나, 요청한 키를
-      다 채우지 않는 등 응답 형식이 기대와 다를 때
-    무엇이 됐든 실패로 간주하고 조용히 None을 돌려준다(부분 성공은 인정하지 않는다 —
-    호출부가 "전부 성공 아니면 전부 fallback"만 신경 쓰면 되게 하기 위함).
+    ask_batch()는 {센서 이름: 대사} dict를 돌려준다. 요청 자체가 실패하면(API 키 없음/
+    네트워크 오류·timeout/tool call 없음/JSON 파싱 실패 등) None을 돌려준다. 요청은
+    성공했지만 모델이 일부 키를 채우지 않았다면, 채워진 키만큼만 담은 "부분" dict를
+    돌려준다(돌아온 게 하나도 없으면 빈 dict) — 성공한 부분까지 통째로 버리지 않기
+    위함이다. 어느 경우든 실패/누락 사유는 stderr에 경고로 출력하지만 반환값은 그대로다.
     """
 
     def __init__(
@@ -119,7 +122,11 @@ class LLMConnection:
         self.max_tokens = max_tokens
 
     def ask_batch(self, species: str, situations: Dict[str, List[str]]) -> Optional[Dict[str, str]]:
-        if not self.api_key or not situations:
+        if not situations:
+            return None
+
+        if not self.api_key:
+            _warn("PLANTA_GOCHI_LLM_KEY가 없어 LLM 호출을 건너뜁니다. default_dialog로 대체됩니다.")
             return None
 
         keys = list(situations.keys())
@@ -153,14 +160,24 @@ class LLMConnection:
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = json.loads(response.read().decode("utf-8"))
+        except Exception as e:
+            _warn(f"요청 실패(model={self.model!r}): {e!r}. 전부 default_dialog로 대체됩니다.")
+            return None
 
+        try:
             tool_calls = body["choices"][0]["message"]["tool_calls"]
             arguments = json.loads(tool_calls[0]["function"]["arguments"])
-
-            if not isinstance(arguments, dict) or not all(key in arguments for key in keys):
-                return None
-
-            return {key: str(arguments[key]) for key in keys}
-        except Exception:
-            # 키 없음/timeout/네트워크 오류/tool call 없음/JSON 파싱 실패 등 무엇이든 실패로 간주.
+        except Exception as e:
+            _warn(f"응답 파싱 실패(model={self.model!r}): {e!r}. 전부 default_dialog로 대체됩니다.")
             return None
+
+        if not isinstance(arguments, dict):
+            _warn(f"tool call arguments가 dict가 아닙니다: {arguments!r}. 전부 default_dialog로 대체됩니다.")
+            return None
+
+        result = {key: str(arguments[key]) for key in keys if key in arguments}
+        missing = [key for key in keys if key not in arguments]
+        if missing:
+            _warn(f"응답에 없는 키 {missing}는 default_dialog로 대체됩니다(나머지는 LLM 응답 사용).")
+
+        return result

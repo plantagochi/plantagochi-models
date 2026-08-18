@@ -21,9 +21,11 @@ class PlantAI:
         센서별 prompt(list[str])를 모아 LLM에는 tool-calling으로 "한 번"만 요청해
         센서별 대사를 한 번에 받아온다.
 
-        LLM 호출이 어떤 이유로든 실패하면(키 없음/timeout/응답 형식 이상 등) 전체를
-        Persona의 default_dialog로 대체한다 — 센서별로 결과가 섞이지 않도록 전부 성공
-        아니면 전부 fallback으로 처리한다.
+        LLM 요청 자체가 실패하면(키 없음/timeout/응답 형식 이상 등) 전체를 Persona의
+        default_dialog로 대체한다. 요청은 성공했지만 일부 센서만 응답에 담겨 왔다면,
+        돌아온 센서는 LLM 응답을 쓰고 나머지만 그 센서의 default_dialog로 대체한다
+        (돌아온 걸 통째로 버리지 않는다). 실패/누락 사유는 LLMConnection이 stderr에
+        경고로 남기며, 이 반환값 자체에는 영향이 없다.
 
         반환값은 센서 이름과 무관하게, 사용자에게 보여줄 짧은 글들을 담은 flat list[str]이다
         (sensor_values 순서를 따른다). LLM 성공 시에는 센서당 문자열 하나씩이고, fallback

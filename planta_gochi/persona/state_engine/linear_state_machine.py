@@ -59,8 +59,10 @@ class LinearStateMachine(StateEngine):
         }
 
         return result
-        
 
-    
-        
-    
+    def get_state(self) -> dict:
+        # prev_value는 원본 센서 raw 값(숫자)이라 enum 변환이 필요 없다.
+        return {"prev_value": self.prev_value}
+
+    def load_state(self, state: dict) -> None:
+        self.prev_value = state.get("prev_value")

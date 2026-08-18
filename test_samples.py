@@ -1,5 +1,9 @@
+import functools
+import http.server
+import io
+import threading
 import time
-from planta_gochi import LeafAnalyzer
+from planta_gochi.sensory import LeafAnalyzer
 from pathlib import Path
 import numpy as np
 from PIL import Image
@@ -48,6 +52,34 @@ arr = np.array(Image.open(IMAGE).convert("RGB"))
 result = analyzer.analyze(arr)
 results["numpy"] = result["leaf_count"]
 print(f"[numpy]      leaves={result['leaf_count']} ratio={result['total_area']['ratio']}")
+
+# 6. bytearray
+result = analyzer.analyze(bytearray(img_bytes))
+results["bytearray"] = result["leaf_count"]
+print(f"[bytearray]  leaves={result['leaf_count']} ratio={result['total_area']['ratio']}")
+
+# 7. file-like 객체 (io.BytesIO, 열린 파일 핸들 등 .read()를 가진 것 아무거나)
+result = analyzer.analyze(io.BytesIO(img_bytes))
+results["bytesio"] = result["leaf_count"]
+print(f"[BytesIO]    leaves={result['leaf_count']} ratio={result['total_area']['ratio']}")
+
+with open(IMAGE, "rb") as f:
+    result = analyzer.analyze(f)
+    results["file_handle"] = result["leaf_count"]
+    print(f"[file 핸들]  leaves={result['leaf_count']} ratio={result['total_area']['ratio']}")
+
+# 8. http(s) URL (외부 네트워크 없이, 로컬 HTTP 서버로 테스트)
+_handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=".")
+_httpd = http.server.HTTPServer(("127.0.0.1", 0), _handler)
+_thread = threading.Thread(target=_httpd.serve_forever, daemon=True)
+_thread.start()
+try:
+    url = f"http://127.0.0.1:{_httpd.server_port}/{IMAGE}"
+    result = analyzer.analyze(url)
+    results["url"] = result["leaf_count"]
+    print(f"[URL]        leaves={result['leaf_count']} ratio={result['total_area']['ratio']}")
+finally:
+    _httpd.shutdown()
 
 # 결과 일치 확인
 counts = list(results.values())

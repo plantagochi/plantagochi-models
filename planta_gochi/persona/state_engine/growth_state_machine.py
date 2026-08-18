@@ -73,3 +73,19 @@ class GrowthStateMachine(StateEngine):
         }
 
         return result
+
+    def get_state(self) -> dict:
+        # leaf_analyzer는 모델 wrapper일 뿐 프레임 간 이어질 상태가 없어 제외한다.
+        return {
+            "count_machine": self.count_machine.get_state(),
+            "canopy_machine": self.canopy_machine.get_state(),
+            "leaf_size_machine": self.leaf_size_machine.get_state(),
+        }
+
+    def load_state(self, state: dict) -> None:
+        if "count_machine" in state:
+            self.count_machine.load_state(state["count_machine"])
+        if "canopy_machine" in state:
+            self.canopy_machine.load_state(state["canopy_machine"])
+        if "leaf_size_machine" in state:
+            self.leaf_size_machine.load_state(state["leaf_size_machine"])

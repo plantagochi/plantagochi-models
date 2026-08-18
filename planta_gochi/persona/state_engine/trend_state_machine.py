@@ -124,3 +124,22 @@ class TrendStateMachine(StateEngine):
         }
 
         return result
+
+    def get_state(self) -> dict:
+        # raw_history/smoothed_history는 slope 계산에 그대로 필요한 배열형 데이터다
+        # (다음 update부터 다시 이어서 MAD/EMA/회귀를 계산하려면 window개 분량의 과거
+        # 값이 있어야 함). ema/prev_state는 스칼라라 그대로 담고, prev_state(enum)만
+        # .value로 변환한다.
+        return {
+            "ema": self.ema,
+            "prev_state": self.prev_state.value if self.prev_state is not None else None,
+            "raw_history": list(self.raw_history),
+            "smoothed_history": list(self.smoothed_history),
+        }
+
+    def load_state(self, state: dict) -> None:
+        self.ema = state.get("ema")
+        prev_state_value = state.get("prev_state")
+        self.prev_state = TrendState(prev_state_value) if prev_state_value is not None else None
+        self.raw_history = deque(state.get("raw_history", []), maxlen=self.window * 3)
+        self.smoothed_history = deque(state.get("smoothed_history", []), maxlen=self.window)

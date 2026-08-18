@@ -20,3 +20,19 @@ class StateEngine(ABC):
         모양으로 다룰 수 있다.
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def get_state(self) -> dict:
+        """
+        다음 update를 이어가는 데 필요한 최소한의 순수 상태(state)를 dict로 돌려준다.
+        thresholds/prompts 같은 정적 설정은 포함하지 않는다 — 그건 JSON(known_plant_builder)이
+        갖고 있고 로드 시점에 다시 만들어지므로 여기서 또 담을 필요가 없다.
+        PostgreSQL 등 외부 저장소에 그대로 넣을 수 있도록, enum은 반드시 .value(int)로
+        변환해서 담아야 하고 값은 JSON 호환 타입(int/float/str/bool/None/list/dict)이어야 한다.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def load_state(self, state: dict) -> None:
+        """get_state()가 만든 dict를 받아 내부 상태를 그 시점으로 복원한다."""
+        raise NotImplementedError

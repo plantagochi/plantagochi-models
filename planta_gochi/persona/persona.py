@@ -35,3 +35,24 @@ class Persona:
                 continue
             results[sensor_name] = engine.detect_event(value)
         return results
+
+    def get_state(self) -> Dict[str, dict]:
+        """
+        {센서 이름: engine.get_state()} 형태로 모든 센서의 현재 상태를 모아 돌려준다.
+        thresholds/prompts 같은 정적 설정은 빠져 있다 — JSON(known_plant_builder)에서 다시
+        만들어지므로, 여기 담기는 건 순수하게 update()를 거치며 바뀌는 값들뿐이다.
+        이 dict는 즉시 pickle/json 등으로 저장했다가 load_state()로 그대로 복원할 수 있다.
+        """
+        return {sensor_name: engine.get_state() for sensor_name, engine in self.engines.items()}
+
+    def load_state(self, states: Dict[str, dict]) -> None:
+        """
+        get_state()가 만든 dict를 받아 각 센서의 engine 상태를 복원한다. Persona 자체(이름,
+        engine 종류/설정)는 이미 known_plant_builder 등으로 구성되어 있다고 가정하고, 그
+        위에 저장해둔 state만 덮어씌운다. Persona가 모르는 센서 이름은 무시한다.
+        """
+        for sensor_name, state in states.items():
+            engine = self.engines.get(sensor_name)
+            if engine is None:
+                continue
+            engine.load_state(state)

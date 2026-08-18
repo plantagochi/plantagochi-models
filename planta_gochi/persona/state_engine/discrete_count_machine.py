@@ -77,3 +77,17 @@ class DiscreteCountMachine(StateEngine):
         }
 
         return result
+
+    def get_state(self) -> dict:
+        # confirmed_count/candidate_count/streak 전부 스칼라 int(또는 None)라 enum 변환도
+        # 배열 처리도 필요 없다.
+        return {
+            "confirmed_count": self.confirmed_count,
+            "candidate_count": self.candidate_count,
+            "streak": self.streak,
+        }
+
+    def load_state(self, state: dict) -> None:
+        self.confirmed_count = state.get("confirmed_count")
+        self.candidate_count = state.get("candidate_count")
+        self.streak = state.get("streak", 0)

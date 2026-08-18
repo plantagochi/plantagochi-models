@@ -15,7 +15,9 @@ _DEFAULT_ONNX = _ASSETS / "best.onnx"
 _DEFAULT_TFLITE = _ASSETS / "best_float32.tflite"
 _DEFAULT_TFLITE16 = _ASSETS / "best_float16.tflite"
 
-ImageInput = Union[str, Path, bytes, "PIL.Image.Image", np.ndarray] # type: ignore
+# str/Path는 로컬 파일 경로 또는 http(s) URL 둘 다 받는다. 그 외에 .read()를 갖는
+# file-like 객체(io.BytesIO, 열린 파일 핸들, S3 스트리밍 응답 등)도 받는다.
+ImageInput = Union[str, Path, bytes, bytearray, "PIL.Image.Image", np.ndarray] # type: ignore
 
 class LeafAnalyzer:
     """
@@ -68,9 +70,11 @@ class LeafAnalyzer:
 
         Parameters
         ----------
-        image : str | Path | bytes | PIL.Image | np.ndarray
-            Image to analyze. Accepts file path, raw bytes (e.g. from S3),
-            PIL Image, or a numpy array (HWC, uint8, RGB).
+        image : str | Path | bytes | bytearray | file-like | PIL.Image | np.ndarray
+            Image to analyze. Accepts a local file path, an http(s) URL (str),
+            raw bytes/bytearray (e.g. from S3), any file-like object with a
+            .read() method (io.BytesIO, an open file handle, a streaming
+            response body, ...), a PIL Image, or a numpy array (HWC, uint8, RGB).
 
         Returns
         -------
@@ -118,7 +122,11 @@ class LeafAnalyzer:
 
         # bytes (e.g. S3 response body)
         if isinstance(image, (bytes, bytearray)):
-            return _decode_bytes(image)
+            return _decode_bytes(bytes(image))
+
+        # http(s) URL
+        if isinstance(image, str) and _is_url(image):
+            return _decode_bytes(_fetch_url(image))
 
         # file path
         if isinstance(image, (str, Path)):
@@ -127,10 +135,28 @@ class LeafAnalyzer:
                 raise FileNotFoundError(f"Image not found: {path}")
             return _decode_bytes(path.read_bytes())
 
+        # file-like object (io.BytesIO, open file handle, streaming response body, ...)
+        if hasattr(image, "read"):
+            return _decode_bytes(image.read())
+
         raise TypeError(
             f"Unsupported image type: {type(image)}. "
-            "Pass a file path (str/Path), bytes, PIL.Image, or numpy array."
+            "Pass a file path, http(s) URL, bytes/bytearray, a file-like object, "
+            "a PIL.Image, or a numpy array."
         )
+
+
+def _is_url(value: str) -> bool:
+    return value.startswith("http://") or value.startswith("https://")
+
+
+def _fetch_url(url: str, timeout: float = 10) -> bytes:
+    """http(s) URL에서 이미지 바이트를 내려받는다. requests 등 외부 의존성 없이 표준
+    라이브러리 urllib만 사용한다."""
+    import urllib.request
+
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        return response.read()
 
 
 def _decode_bytes(data: bytes) -> np.ndarray:
