@@ -1,8 +1,8 @@
-# PlantAI (ai.speak 사용법)
+# PlantAI (ai.speak / get_mood / get_growth_stage 사용법)
 
 `PlantAI`는 `Persona`(state machine 기반 prompt/default_dialog)와 `LLMConnection`
 (OpenRouter 호출)을 묶어서, 센서 값을 넣으면 최종적으로 사용자에게 보여줄 짧은 대사
-목록을 만들어주는 클래스입니다.
+목록, mood(표정), 성장 단계까지 만들어주는 클래스입니다.
 
 ## 기본 사용법
 
@@ -51,6 +51,49 @@ for message in messages:
    경우 fallback 시 여러 개의 짧은 글로 나뉘어 들어갑니다.
 6. `TrendStateMachine`이 아직 추세를 판단할 데이터가 부족한 동안(`INSUFFICIENT_DATA`)은
    애초에 `prompt`/`default_dialog`가 빈 `list`라 아무 메시지도 추가되지 않습니다.
+
+## get_mood() / get_growth_stage() — 표정/성장 단계 뽑기
+
+`speak()`는 LLM을 호출하는 무거운 메서드입니다. UI 아바타 표정이나 성장 단계 표시처럼
+자주 갱신해야 하는 값은 LLM 없이 `get_mood()`/`get_growth_stage()`로 바로 뽑을 수
+있습니다.
+
+**persona state를 실제로 갱신하는(=`persona.update()`를 부르는) 메서드는 `speak()`
+하나뿐입니다.** `get_mood()`/`get_growth_stage()`는 인자를 받지 않는 순수 read
+메서드로, `speak()`가 마지막으로 갱신해둔 결과를 읽기만 합니다 — 그래서 둘 다 몇 번을
+불러도 state machine에는 아무 영향이 없고, `speak()`를 다시 부르기 전까지는 항상 같은
+값을 돌려줍니다.
+
+```python
+from planta_gochi.persona.sheets import build_known_persona
+from planta_gochi.plant_ai import PlantAI
+
+persona = build_known_persona("상추")
+ai = PlantAI(persona)
+
+sensor_values = {
+    "temperature": 20, "humidity": 60,
+    "soil_temp": 17, "soil_humidity": 55,
+    "growth": "sample_easy.jpg",
+}
+
+messages = ai.speak(sensor_values)  # persona state를 갱신하는 유일한 지점
+mood = ai.get_mood()                # 방금 speak()가 갱신한 결과를 읽기만 함
+stage = ai.get_growth_stage()       # 마찬가지
+```
+
+- **`get_mood() -> Expression`**: `planta_gochi.persona.mood.Expression`
+  (`HAPPY`/`NEUTRAL`/`EXCITED`/`DISTRESSED`) 하나를 돌려줍니다. mood 판단 규칙 자체는
+  `planta_gochi/persona/mood.py`에 있습니다(센서별 상태 → mood_key → Expression, 여러
+  센서 중 가장 심각한 것 채택, growth는 leaf_count/canopy/leaf_size 중 2개 이상
+  나빠지면 무조건 DISTRESSED).
+- **`get_growth_stage() -> int | None`**: `"growth"` 센서 결과의 성장 단계(**1~4만**
+  나옵니다 — 5단계는 카메라 프레임 이탈로 데이터를 신뢰할 수 없어 아직 기준값이 없습니다.
+  자세한 내용은 `planta_gochi/persona/growth_stage.py`). persona에 `"growth"` 센서가
+  없거나 마지막 `speak()` 호출에 `"growth"` 값을 안 넣었으면 `None`을 돌려줍니다.
+
+`speak()`를 한 번도 호출하지 않은 상태에서 `get_mood()`/`get_growth_stage()`를 부르면
+`RuntimeError`가 납니다 — 아직 읽을 결과가 없다는 뜻입니다.
 
 ## 실패 지점 확인하기 (stderr 경고)
 

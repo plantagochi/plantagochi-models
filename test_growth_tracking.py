@@ -158,6 +158,8 @@ class GrowthStateMachineTests(unittest.TestCase):
                 "canopy_trend",
                 "leaf_size_trend",
                 "raw_event",
+                "raw_metrics",
+                "stage",
             },
         )
         self.assertEqual(result["leaf_count"]["count"], 4)

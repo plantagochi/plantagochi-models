@@ -33,3 +33,9 @@ final_messages = ai.speak(
 print("PlantAI 최종 대사 (여러 개의 글):")
 for message in final_messages:
     print(" -", message)
+
+# get_mood()/get_growth_stage()는 persona state를 갱신하지 않는 순수 read다 —
+# 방금 speak()가 갱신해둔 결과를 그대로 읽는다.
+print()
+print("mood:", ai.get_mood())
+print("growth_stage:", ai.get_growth_stage())

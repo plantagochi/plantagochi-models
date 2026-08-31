@@ -56,6 +56,7 @@ class LinearStateMachine(StateEngine):
             "event_prompt": event_prompt,
             "state_prompt": state_prompt,
             "raw_event": event,
+            "state": state,
         }
 
         return result

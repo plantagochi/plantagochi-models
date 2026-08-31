@@ -3,6 +3,7 @@ from __future__ import annotations
 import statistics
 from typing import Any, Optional
 
+from planta_gochi.persona.growth_stage import classify_growth_stage
 from planta_gochi.persona.state_engine import DiscreteCountMachine, StateEngine, TrendStateMachine
 from planta_gochi.sensory import LeafAnalyzer
 
@@ -48,7 +49,7 @@ class GrowthStateMachine(StateEngine):
         payload = self.leaf_analyzer.analyze(curr_value)
 
         leaf_count = payload["leaf_count"]
-        total_ratio = payload["total_area"]["ratio"]
+        total_ratio = float(payload["total_area"]["ratio"])  # numpy scalar -> plain float (JSON-safe)
         area_ratios = payload["leaf_areas"]["ratio"]
         median_ratio = statistics.median(area_ratios) if area_ratios else 0.0
 
@@ -70,6 +71,14 @@ class GrowthStateMachine(StateEngine):
                 "canopy_trend": canopy_result["raw_event"],
                 "leaf_size_trend": leaf_size_result["raw_event"],
             },
+            # classify_growth_stage()는 1~4만 반환한다(5단계는 카메라 프레임 이탈로
+            # 데이터를 신뢰할 수 없어 기준값 자체가 없음 — growth_stage.py 참고).
+            "raw_metrics": {
+                "leaf_count": leaf_count,
+                "canopy_ratio": total_ratio,
+                "leaf_size_ratio": median_ratio,
+            },
+            "stage": classify_growth_stage(leaf_count, total_ratio, median_ratio),
         }
 
         return result
