@@ -105,6 +105,7 @@ sensor_values = {
 messages = ai.speak(sensor_values)  # persona state를 갱신하는 유일한 지점
 mood = ai.get_mood()                # 방금 speak()가 갱신한 결과를 읽기만 함
 stage = ai.get_growth_stage()       # 마찬가지
+effects = ai.get_status_effect()    # 마찬가지
 ```
 
 - **`get_mood() -> Expression`**: `planta_gochi.persona.mood.Expression`
@@ -114,13 +115,31 @@ stage = ai.get_growth_stage()       # 마찬가지
   나빠지면 무조건 DISTRESSED). `"disease"` 센서는 `confirmed_state`가 `BACTERIAL`/
   `FUNGAL`이면 그냥 "sick"(→ `DISTRESSED`)으로 묶입니다 — 어떤 병인지는 mood에서는
   구분하지 않습니다.
-- **`get_growth_stage() -> int | None`**: `"growth"` 센서 결과의 성장 단계(**1~4만**
+- **`get_growth_stage() -> int`**: `"growth"` 센서 결과의 성장 단계(**1~4만**
   나옵니다 — 5단계는 카메라 프레임 이탈로 데이터를 신뢰할 수 없어 아직 기준값이 없습니다.
   자세한 내용은 `planta_gochi/persona/growth_stage.py`). persona에 `"growth"` 센서가
-  없거나 마지막 `speak()` 호출에 `"growth"` 값을 안 넣었으면 `None`을 돌려줍니다.
+  없거나 마지막 `speak()` 호출에 `"growth"` 값을 안 넣었으면 `0`을 돌려줍니다.
+- **`get_status_effect() -> list[StatusEffect]`**: 게임의 "상태이상"처럼, 지금
+  활성화된 상태이상 문구를 담은 리스트를 돌려줍니다(판단 규칙은
+  `planta_gochi/persona/status_effect.py`). `mood`와 마찬가지로 항상 **현재 state**
+  기준이고, "완만한" 상태가 아니라 **critical(극단) 구간에서만** 발동합니다:
 
-`speak()`를 한 번도 호출하지 않은 상태에서 `get_mood()`/`get_growth_stage()`를 부르면
-`RuntimeError`가 납니다 — 아직 읽을 결과가 없다는 뜻입니다.
+  | 원인 | 상태이상 |
+  |---|---|
+  | disease = `BACTERIAL` | `"박테리아"` |
+  | disease = `FUNGAL` | `"곰팡이"` |
+  | temperature 극단 고온 / 저온 | `"타는듯한온도"` / `"어는듯한온도"` |
+  | humidity 극단 고습 / 저습 | `"정글같은습도"` / `"사막같은습도"` |
+  | soil_temp 극단 고온 / 저온 | `"타들어가는뿌리"` / `"얼어붙은뿌리"` |
+  | soil_humidity 극단 고습 / 저습 | `"썩어가는뿌리"` / `"메마른뿌리"` |
+
+  동시에 여러 개가 활성화되면 전부 리스트에 담겨 나옵니다(위 표 순서 고정). 아무
+  상태이상도 없으면 빈 리스트입니다. `StatusEffect`도 `Expression`처럼 `(str, Enum)`이라
+  그 자체로 문자열처럼 쓸 수 있습니다(`.value`로 순수 문자열도 꺼낼 수 있음).
+
+`speak()`를 한 번도 호출하지 않은 상태에서 `get_mood()`/`get_growth_stage()`/
+`get_status_effect()`를 부르면 `RuntimeError`가 납니다 — 아직 읽을 결과가 없다는
+뜻입니다.
 
 ## 실패 지점 확인하기 (stderr 경고)
 

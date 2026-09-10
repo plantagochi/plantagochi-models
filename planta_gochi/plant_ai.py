@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from planta_gochi.llm.connection import LLMConnection
 from planta_gochi.persona.mood import Expression, extract_expression
 from planta_gochi.persona.persona import Persona
+from planta_gochi.persona.status_effect import StatusEffect, extract_status_effects
 
 
 class PlantAI:
@@ -88,3 +89,15 @@ class PlantAI:
         if growth_result is None:
             return 0
         return growth_result.get("stage")
+
+    def get_status_effect(self) -> List[StatusEffect]:
+        """
+        가장 최근 speak() 호출이 갱신해둔 결과로, 지금 활성화된 상태이상(게임의
+        "디버프"처럼) 목록을 뽑아 돌려준다(판단 규칙은 planta_gochi.persona.status_effect
+        참고 — disease가 BACTERIAL/FUNGAL이거나, temperature/humidity/soil_temp/
+        soil_humidity 중 하나라도 극단적으로 높거나 낮으면 그에 맞는 문구가 포함된다).
+        get_mood()와 마찬가지로 persona state를 갱신하지 않는 순수 read 메서드다.
+        활성화된 상태이상이 없으면 빈 list. speak()를 아직 한 번도 안 불렀다면
+        RuntimeError.
+        """
+        return extract_status_effects(self._require_last_result())
