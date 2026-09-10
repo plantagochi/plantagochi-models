@@ -370,6 +370,46 @@
           "GROWING_TO_STAGNANT": "자라던 게 잠깐 멈췄어요, 조금 아쉬워요"
         }
       }
+    },
+    "disease": {
+      "type": "disease",
+      "disease_analyzer": {
+        "backend": "onnx"
+      },
+      "confirm_streak": 5,
+      "state_prompts": {
+        "HEALTHY": "잎에 병이 없어 건강함을 느낌",
+        "BACTERIAL": "세균성 병에 걸려 잎이 상해가는 것을 걱정함",
+        "FUNGAL": "곰팡이성 병에 걸려 잎이 상해가는 것을 걱정함"
+      },
+      "event_prompts": {
+        "NO_EVENTS": "질병 상태에 특별한 변화가 없음",
+
+        "HEALTHY_TO_BACTERIAL": "건강했는데 갑자기 세균성 병에 걸린 것을 알아채고 크게 놀라고 걱정함",
+        "HEALTHY_TO_FUNGAL": "건강했는데 갑자기 곰팡이성 병에 걸린 것을 알아채고 크게 놀라고 걱정함",
+
+        "BACTERIAL_TO_HEALTHY": "세균성 병을 이겨내고 다시 건강해져 크게 안도함",
+        "BACTERIAL_TO_FUNGAL": "세균성 병이 낫지 않았는데 이번엔 곰팡이성 병까지 겹쳐 더 크게 걱정함",
+
+        "FUNGAL_TO_HEALTHY": "곰팡이성 병을 이겨내고 다시 건강해져 크게 안도함",
+        "FUNGAL_TO_BACTERIAL": "곰팡이성 병이 낫지 않았는데 이번엔 세균성 병까지 겹쳐 더 크게 걱정함"
+      },
+      "default_dialog": {
+        "HEALTHY": "저 지금 건강해요! 병 없이 쌩쌩해요",
+        "BACTERIAL": "몸에 세균성 병이 있는 것 같아요... 도와주세요",
+        "FUNGAL": "몸에 곰팡이가 핀 것 같아요... 도와주세요",
+
+        "NO_EVENTS": "질병 상태는 그대로예요",
+
+        "HEALTHY_TO_BACTERIAL": "어... 갑자기 세균성 병에 걸린 것 같아요! 무서워요",
+        "HEALTHY_TO_FUNGAL": "어... 갑자기 곰팡이가 핀 것 같아요! 무서워요",
+
+        "BACTERIAL_TO_HEALTHY": "세균성 병이 다 나았어요! 이제 괜찮아요",
+        "BACTERIAL_TO_FUNGAL": "세균성 병도 안 나았는데 곰팡이까지... 너무 힘들어요",
+
+        "FUNGAL_TO_HEALTHY": "곰팡이가 다 사라졌어요! 이제 괜찮아요",
+        "FUNGAL_TO_BACTERIAL": "곰팡이도 안 나았는데 세균성 병까지... 너무 힘들어요"
+      }
     }
   }
 }

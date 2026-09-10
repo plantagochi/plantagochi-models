@@ -32,6 +32,14 @@ JSON spec 형태 (known_plants/상추.json 참고):
                 "event_prompts": {"NO_EVENTS": "...", "STAGNANT_TO_GROWING": "...", ...},
                 "default_dialog": {...}
             }
+        },
+        "disease": {
+            "type": "disease",
+            "disease_analyzer": {"backend": "onnx"},
+            "confirm_streak": 5,
+            "state_prompts": {"HEALTHY": "...", "BACTERIAL": "...", "FUNGAL": "..."},
+            "event_prompts": {"NO_EVENTS": "...", "HEALTHY_TO_BACTERIAL": "...", ...},
+            "default_dialog": {...}
         }
     }
 }
@@ -47,10 +55,15 @@ default_dialog는 state_prompts/event_prompts에 있는 모든 state/event를 �
 독립된 TrendStateMachine 인스턴스, 문구는 trend_machine 섹션 하나를 공유)를 묶은
 GrowthStateMachine을 만든다. leaf_analyzer는 생략하면 기본 backend("onnx")로 생성된다.
 
-engine "type"별 조립 방법은 _ENGINE_BUILDERS에 등록되어 있다. 지금은 "linear"/"growth"만
-있지만, 이후 boolean state machine이 추가되면 build_boolean_state_machine 같은
-함수를 만들어 @register_engine_builder("boolean")으로 등록하기만 하면 되고,
-이 파일의 나머지 파싱/조립 로직이나 Persona는 전혀 건드릴 필요가 없다.
+"disease" 타입은 DiseaseAnalyzer(bacterial/fungal/healthy 3-클래스 분류기)를
+DiscreteCountMachine과 같은 debounce 구조로 감싼 DiseaseStateMachine을 만든다 —
+같은 진단이 confirm_streak(기본 5)번 연속 나와야 confirmed_state가 바뀐다.
+disease_analyzer는 생략하면 기본 backend("onnx")로 생성된다.
+
+engine "type"별 조립 방법은 _ENGINE_BUILDERS에 등록되어 있다. 지금은
+"linear"/"growth"/"disease"가 있지만, 이후 새 타입이 추가되면 build_xxx 함수를 만들어
+@register_engine_builder("xxx")로 등록하기만 하면 되고, 이 파일의 나머지 파싱/조립
+로직이나 Persona는 전혀 건드릴 필요가 없다.
 """
 
 import json
@@ -62,6 +75,9 @@ from planta_gochi.persona.state_engine import (
     CountEvents,
     CountState,
     DiscreteCountMachine,
+    DiseaseEvents,
+    DiseaseState,
+    DiseaseStateMachine,
     GrowthStateMachine,
     LinearEvents,
     LinearState,
@@ -71,7 +87,7 @@ from planta_gochi.persona.state_engine import (
     TrendState,
     TrendStateMachine,
 )
-from planta_gochi.sensory import LeafAnalyzer
+from planta_gochi.sensory import DiseaseAnalyzer, LeafAnalyzer
 
 KNOWN_PLANTS_DIR = Path(__file__).parent / "known_plants"
 
@@ -183,6 +199,27 @@ def build_growth_state_machine(spec: dict) -> GrowthStateMachine:
         canopy_machine=canopy_machine,
         leaf_size_machine=leaf_size_machine,
         leaf_analyzer=LeafAnalyzer(**leaf_analyzer_spec),
+    )
+
+
+@register_engine_builder("disease")
+def build_disease_state_machine(spec: dict) -> DiseaseStateMachine:
+    state_prompts = _parse_enum_dict(spec["state_prompts"], DiseaseState)
+    event_prompts = _parse_enum_dict(spec["event_prompts"], DiseaseEvents)
+    default_dialog = _parse_state_or_event_dict(spec["default_dialog"], DiseaseState, DiseaseEvents)
+    _validate_dialog_coverage(state_prompts, event_prompts, default_dialog)
+
+    disease_analyzer_spec = spec.get("disease_analyzer", {})
+    kwargs = {}
+    if "confirm_streak" in spec:
+        kwargs["confirm_streak"] = spec["confirm_streak"]
+
+    return DiseaseStateMachine(
+        state_prompts=state_prompts,
+        event_prompts=event_prompts,
+        default_dialog=default_dialog,
+        disease_analyzer=DiseaseAnalyzer(**disease_analyzer_spec),
+        **kwargs,
     )
 
 

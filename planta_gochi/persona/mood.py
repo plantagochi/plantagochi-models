@@ -16,9 +16,11 @@ Persona.update()의 결과(센서 이름 -> detect_event 결과 dict)를 보고,
 --------------------------------
 이벤트(raw_event)는 대부분의 프레임에서 NO_EVENTS라 "지금 위험한 상태가 계속되고
 있다"는 걸 표현하지 못한다. 그래서 온도/습도처럼 등급이 있는 센서(LinearStateMachine,
-TrendStateMachine)는 항상 "현재 state"를 기준으로 mood_key를 정한다. 다만
-leaf_count(DiscreteCountMachine)는 등급 개념이 없고(state가 항상 STABLE) 새 잎이
-났다는 것 자체가 유일한 신호라서, 거기에만 예외적으로 이벤트(raw_event)를 쓴다.
+TrendStateMachine)뿐 아니라 disease(DiseaseStateMachine)도 항상 "현재 state"를
+기준으로 mood_key를 정한다 — 병이 하루 전에 발견됐든 방금 확정됐든, 낫기 전까지는
+계속 "sick"이어야 하기 때문이다. 다만 leaf_count(DiscreteCountMachine)는 등급 개념이
+없고(state가 항상 STABLE) 새 잎이 났다는 것 자체가 유일한 신호라서, 거기에만
+예외적으로 이벤트(raw_event)를 쓴다.
 
 mood_key -> Expression 매핑은 종(species)과 무관하게 앱 전체에서 통일된 UI 신호라
 (대사 문구와 달리) 종별 JSON이 아니라 이 파일에 고정값으로 둔다.
@@ -43,7 +45,7 @@ NEUTRAL로 두고, DISTRESSED는 이 2개-이상 규칙에서만 나온다 — �
 from enum import Enum
 from typing import Dict, List
 
-from planta_gochi.persona.state_engine import CountEvents, LinearState, TrendState
+from planta_gochi.persona.state_engine import CountEvents, DiseaseState, LinearState, TrendState
 
 
 class Expression(str, Enum):
@@ -94,13 +96,24 @@ _SOIL_HUMIDITY_MOOD = {
     LinearState.VALUE_CRITICAL_HIGH: "roots_drowning",
 }
 
+# disease는 등급이 아니라 "지금 병에 걸려 있는가"만 중요하므로, bacterial/fungal을
+# 굳이 구분하지 않고 둘 다 "sick"으로 모은다(둘 다 MOOD_TO_EXPRESSION에서 DISTRESSED).
+_DISEASE_MOOD = {
+    DiseaseState.HEALTHY: "neutral",
+    DiseaseState.BACTERIAL: "sick",
+    DiseaseState.FUNGAL: "sick",
+}
+
 # 센서 이름(known_plant_builder JSON의 sensors 키)마다 어떤 mood 테이블을 쓸지.
-# 여기 없는 센서 이름(known_plant_builder가 모르는 것 포함)은 mood 추출에서 무시된다.
-_LINEAR_SENSOR_MOOD_TABLES = {
+# 전부 "현재 state" 기준(temperature/humidity/soil_temp/soil_humidity/disease 공통 —
+# growth만 예외로 아래 _growth_expression에서 따로 다룬다). 여기 없는 센서 이름
+# (known_plant_builder가 모르는 것 포함)은 mood 추출에서 무시된다.
+_STATE_MOOD_TABLES = {
     "temperature": _TEMPERATURE_MOOD,
     "humidity": _HUMIDITY_MOOD,
     "soil_temp": _SOIL_TEMP_MOOD,
     "soil_humidity": _SOIL_HUMIDITY_MOOD,
+    "disease": _DISEASE_MOOD,
 }
 
 # growth 내부 leaf_count(DiscreteCountMachine)는 state가 없고 event만 의미 있다.
@@ -149,6 +162,8 @@ MOOD_TO_EXPRESSION: Dict[str, Expression] = {
     "well_watered": Expression.HAPPY,
     "soil_soggy": Expression.NEUTRAL,
     "roots_drowning": Expression.DISTRESSED,
+    # disease
+    "sick": Expression.DISTRESSED,
     # growth
     "new_leaf_joy": Expression.EXCITED,
     "leaf_loss": Expression.NEUTRAL,  # 단독으로는 NEUTRAL. 2개 이상 겹치면 _growth_expression이 DISTRESSED로 override.
@@ -199,7 +214,7 @@ def extract_expression(persona_result: Dict[str, dict]) -> Expression:
     """
     candidates: List[Expression] = []
 
-    for sensor_name, mood_table in _LINEAR_SENSOR_MOOD_TABLES.items():
+    for sensor_name, mood_table in _STATE_MOOD_TABLES.items():
         result = persona_result.get(sensor_name)
         if result is None or "state" not in result:
             continue

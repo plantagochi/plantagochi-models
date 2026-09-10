@@ -74,7 +74,7 @@ class PlantAI:
         """
         return extract_expression(self._require_last_result())
 
-    def get_growth_stage(self) -> Optional[int]:
+    def get_growth_stage(self) -> int:
         """
         가장 최근 speak() 호출이 갱신해둔 결과에서 growth 센서의 성장 단계(1~4)를
         돌려준다(판단 규칙은 planta_gochi.persona.growth_stage 참고). get_mood()와
@@ -86,5 +86,5 @@ class PlantAI:
         """
         growth_result = self._require_last_result().get("growth")
         if growth_result is None:
-            return None
+            return 0
         return growth_result.get("stage")

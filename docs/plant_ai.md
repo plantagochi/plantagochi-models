@@ -86,7 +86,9 @@ stage = ai.get_growth_stage()       # 마찬가지
   (`HAPPY`/`NEUTRAL`/`EXCITED`/`DISTRESSED`) 하나를 돌려줍니다. mood 판단 규칙 자체는
   `planta_gochi/persona/mood.py`에 있습니다(센서별 상태 → mood_key → Expression, 여러
   센서 중 가장 심각한 것 채택, growth는 leaf_count/canopy/leaf_size 중 2개 이상
-  나빠지면 무조건 DISTRESSED).
+  나빠지면 무조건 DISTRESSED). `"disease"` 센서는 `confirmed_state`가 `BACTERIAL`/
+  `FUNGAL`이면 그냥 "sick"(→ `DISTRESSED`)으로 묶입니다 — 어떤 병인지는 mood에서는
+  구분하지 않습니다.
 - **`get_growth_stage() -> int | None`**: `"growth"` 센서 결과의 성장 단계(**1~4만**
   나옵니다 — 5단계는 카메라 프레임 이탈로 데이터를 신뢰할 수 없어 아직 기준값이 없습니다.
   자세한 내용은 `planta_gochi/persona/growth_stage.py`). persona에 `"growth"` 센서가

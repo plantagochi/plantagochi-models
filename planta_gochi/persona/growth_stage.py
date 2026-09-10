@@ -49,6 +49,10 @@ def classify_growth_stage(leaf_count: float, canopy_ratio: float, leaf_size_rati
     현재 관측치를 STAGE_REFERENCE_MEANS의 1~4단계 평균과 정규화된 유클리드 거리로 비교해
     가장 가까운 단계를 반환한다. 5단계는 기준값이 없어 절대 나오지 않는다.
     """
+    #만약 leaf_count가 0이라면 override
+    if leaf_count == 0:
+        return 0
+
     observed = {
         "leaf_count": leaf_count,
         "canopy_ratio": canopy_ratio,

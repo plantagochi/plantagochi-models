@@ -2,7 +2,7 @@ import unittest
 
 from planta_gochi.persona.mood import Expression, extract_expression
 from planta_gochi.persona.sheets import build_known_persona
-from planta_gochi.persona.state_engine import CountEvents, LinearState, TrendState
+from planta_gochi.persona.state_engine import CountEvents, DiseaseState, LinearState, TrendState
 
 
 def _linear(state: LinearState) -> dict:
@@ -82,6 +82,26 @@ class ExtractExpressionTests(unittest.TestCase):
         }
         self.assertEqual(extract_expression(result), Expression.DISTRESSED)
 
+    def test_disease_healthy_is_neutral(self):
+        result = {"disease": _linear(DiseaseState.HEALTHY)}
+        self.assertEqual(extract_expression(result), Expression.NEUTRAL)
+
+    def test_disease_bacterial_is_distressed(self):
+        result = {"disease": _linear(DiseaseState.BACTERIAL)}
+        self.assertEqual(extract_expression(result), Expression.DISTRESSED)
+
+    def test_disease_fungal_is_distressed(self):
+        result = {"disease": _linear(DiseaseState.FUNGAL)}
+        self.assertEqual(extract_expression(result), Expression.DISTRESSED)
+
+    def test_disease_distressed_wins_over_happy_growth(self):
+        """"disease는 상태 기준"이라 병에 걸려있는 한, growth가 아무리 좋아도 DISTRESSED."""
+        result = {
+            "disease": _linear(DiseaseState.FUNGAL),
+            "growth": _growth(canopy=TrendState.GROWING, leaf_size=TrendState.GROWING),
+        }
+        self.assertEqual(extract_expression(result), Expression.DISTRESSED)
+
 
 class ExtractExpressionIntegrationTests(unittest.TestCase):
     """synthetic dict가 아니라 실제 Persona/JSON 파이프라인을 통과한 결과로도 확인."""
@@ -105,6 +125,21 @@ class ExtractExpressionIntegrationTests(unittest.TestCase):
             "soil_humidity": 55,
         })
         self.assertEqual(extract_expression(result), Expression.HAPPY)
+
+    def test_real_persona_disease_confirmed_is_distressed(self):
+        class _StubDiseaseAnalyzer:
+            def analyze(self, image):
+                return {"label": "bacterial", "confidence": 0.9, "probabilities": {}}
+
+        persona = build_known_persona("상추")
+        persona.engines["disease"].disease_analyzer = _StubDiseaseAnalyzer()
+        persona.engines["disease"].confirmed_state = DiseaseState.BACTERIAL  # 이미 확정된 상태로 시작
+
+        result = persona.update({
+            "temperature": 20, "humidity": 60,  # 다른 건 전부 쾌적해도
+            "disease": "frame.jpg",
+        })
+        self.assertEqual(extract_expression(result), Expression.DISTRESSED)
 
 
 if __name__ == "__main__":

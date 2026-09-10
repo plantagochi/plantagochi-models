@@ -1,7 +1,8 @@
 # Persona 상태 저장/복원 (save / load)
 
 `Persona`는 센서 이름별로 `StateEngine`(`LinearStateMachine`/`TrendStateMachine`/
-`DiscreteCountMachine`/`GrowthStateMachine`)을 들고 있고, `update()`를 부를 때마다
+`DiscreteCountMachine`/`GrowthStateMachine`/`DiseaseStateMachine`)을 들고 있고,
+`update()`를 부를 때마다
 각 엔진 내부의 값(이전 값, 이동평균, 연속 관측 횟수 등)이 바뀝니다. 프로세스가
 재시작되거나 다른 서버가 이어받아 처리해야 할 때 이 값을 잃어버리면 안 되므로,
 `Persona.get_state()` / `Persona.load_state()`로 즉시 저장·복원할 수 있게 되어 있습니다.
@@ -47,6 +48,7 @@ int/float/str/bool/None/list/dict로만 이루어져 있어 `json.dumps()`에 �
 | `DiscreteCountMachine` (leaf_count) | `confirmed_count`, `candidate_count`, `streak` | 전부 스칼라 int |
 | `TrendStateMachine` (canopy/leaf_size 추세) | `ema`, `prev_state`(int), `raw_history`, `smoothed_history` | ⚠️ 아래 참고 |
 | `GrowthStateMachine` (growth) | `count_machine`, `canopy_machine`, `leaf_size_machine` | 위 두 엔진의 state를 그대로 묶은 것 |
+| `DiseaseStateMachine` (disease) | `confirmed_state`(int), `candidate_state`(int), `streak` | 전부 스칼라. `DiscreteCountMachine`과 같은 debounce 구조라 모양도 같음 |
 
 ### ⚠️ 배열형 필드: `raw_history` / `smoothed_history`
 
