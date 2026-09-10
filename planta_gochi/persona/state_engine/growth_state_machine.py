@@ -73,8 +73,8 @@ class GrowthStateMachine(StateEngine):
                 "canopy_trend": canopy_result["raw_event"],
                 "leaf_size_trend": leaf_size_result["raw_event"],
             },
-            # classify_growth_stage()는 1~4만 반환한다(5단계는 카메라 프레임 이탈로
-            # 데이터를 신뢰할 수 없어 기준값 자체가 없음 — growth_stage.py 참고).
+            # classify_growth_stage()는 leaf_count == 0이면 0, 그 외엔 1~5 중 하나를
+            # 반환한다 (growth_stage.py 참고).
             "raw_metrics": {
                 "leaf_count": leaf_count,
                 "canopy_ratio": total_ratio,

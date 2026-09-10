@@ -1,5 +1,5 @@
 """
-LeafAnalyzer 원시 지표(leaf_count/canopy_ratio/leaf_size_ratio)로 성장 단계(1~4)를
+LeafAnalyzer 원시 지표(leaf_count/canopy_ratio/leaf_size_ratio)로 성장 단계(0~5)를
 추정하는 순수 함수. mood.py와 같은 위치의 해석 계층 — StateEngine/Persona는 이 개념을
 모르고, GrowthStateMachine이 계산해둔 값을 받아 분류만 한다.
 
@@ -10,13 +10,12 @@ external/1~16 폴더(각각 하나의 성장 타임라인)를 파일명 마지�
 그걸 다시 16개 폴더에 걸쳐 평균 낸 값이다 (2026-08-31 측정, scratchpad
 estimate_growth_stage_means.py).
 
-5단계 제외
-----------
-100%(수확 직전) 구간은 실측 결과 카메라 프레임을 벗어나 leaf detection 자체가 잘 안
-잡히는 경우가 많아 수치를 신뢰할 수 없었다. 그래서 5단계는 아직 기준값에 넣지 않았고,
-STAGE_REFERENCE_MEANS에 없으므로 classify_growth_stage()는 절대 5를 반환하지 않는다
-(1~4 중 가장 가까운 단계만 고른다). 데이터가 보강되면 STAGE_REFERENCE_MEANS에 5만
-추가하면 자동으로 5단계도 후보에 들어온다.
+0단계: leaf_count == 0
+----------------------
+잎이 하나도 안 보이면(leaf_count == 0) canopy/leaf_size 값과 무관하게 무조건 0단계로
+override한다(거리 기반 분류를 거치지 않음). 1~5단계는 전부 STAGE_REFERENCE_MEANS에
+등록된 평균과의 정규화 거리로 결정된다 — 등록된 것보다 훨씬 크거나 작은 값이 들어와도
+그중 가장 가까운 단계로 클램프될 뿐, 범위를 벗어난 새로운 값을 반환하지 않는다.
 """
 
 import math
@@ -30,6 +29,7 @@ STAGE_REFERENCE_MEANS: Dict[int, Dict[str, float]] = {
     2: {"leaf_count": 21.94, "canopy_ratio": 0.3612, "leaf_size_ratio": 0.0269},
     3: {"leaf_count": 29.36, "canopy_ratio": 0.4995, "leaf_size_ratio": 0.0381},
     4: {"leaf_count": 30.43, "canopy_ratio": 0.6177, "leaf_size_ratio": 0.0505},
+    5: {"leaf_count": 31.10, "canopy_ratio": 0.6377, "leaf_size_ratio": 0.0582},
 }
 
 _METRIC_KEYS = ("leaf_count", "canopy_ratio", "leaf_size_ratio")
@@ -46,8 +46,9 @@ _METRIC_RANGES = {key: _metric_range(key) for key in _METRIC_KEYS}
 
 def classify_growth_stage(leaf_count: float, canopy_ratio: float, leaf_size_ratio: float) -> int:
     """
-    현재 관측치를 STAGE_REFERENCE_MEANS의 1~4단계 평균과 정규화된 유클리드 거리로 비교해
-    가장 가까운 단계를 반환한다. 5단계는 기준값이 없어 절대 나오지 않는다.
+    현재 관측치를 STAGE_REFERENCE_MEANS에 등록된 모든 단계(현재 1~5)의 평균과 정규화된
+    유클리드 거리로 비교해 가장 가까운 단계를 반환한다. leaf_count == 0이면 0을 반환한다
+    (아래 참고).
     """
     #만약 leaf_count가 0이라면 override
     if leaf_count == 0:

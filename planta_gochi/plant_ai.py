@@ -77,13 +77,13 @@ class PlantAI:
 
     def get_growth_stage(self) -> int:
         """
-        가장 최근 speak() 호출이 갱신해둔 결과에서 growth 센서의 성장 단계(1~4)를
+        가장 최근 speak() 호출이 갱신해둔 결과에서 growth 센서의 성장 단계(1~5)를
         돌려준다(판단 규칙은 planta_gochi.persona.growth_stage 참고). get_mood()와
         마찬가지로 persona state를 갱신하지 않는 순수 read 메서드다.
 
         persona에 "growth" 센서가 없거나 마지막 speak() 호출에 growth 값이 없었다면
-        None을 돌려준다. 5단계는 growth_stage.py의 기준값 자체가 1~4까지만 있어서
-        여기서도 나오지 않는다. speak()를 아직 한 번도 안 불렀다면 RuntimeError.
+        0을 돌려준다(leaf_count == 0으로 잎이 하나도 안 보일 때도 0). speak()를
+        아직 한 번도 안 불렀다면 RuntimeError.
         """
         growth_result = self._require_last_result().get("growth")
         if growth_result is None:

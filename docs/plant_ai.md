@@ -115,10 +115,10 @@ effects = ai.get_status_effect()    # 마찬가지
   나빠지면 무조건 DISTRESSED). `"disease"` 센서는 `confirmed_state`가 `BACTERIAL`/
   `FUNGAL`이면 그냥 "sick"(→ `DISTRESSED`)으로 묶입니다 — 어떤 병인지는 mood에서는
   구분하지 않습니다.
-- **`get_growth_stage() -> int`**: `"growth"` 센서 결과의 성장 단계(**1~4만**
-  나옵니다 — 5단계는 카메라 프레임 이탈로 데이터를 신뢰할 수 없어 아직 기준값이 없습니다.
-  자세한 내용은 `planta_gochi/persona/growth_stage.py`). persona에 `"growth"` 센서가
-  없거나 마지막 `speak()` 호출에 `"growth"` 값을 안 넣었으면 `0`을 돌려줍니다.
+- **`get_growth_stage() -> int`**: `"growth"` 센서 결과의 성장 단계(**1~5**, 기준값은
+  `planta_gochi/persona/growth_stage.py`)를 돌려줍니다. `leaf_count == 0`(잎이 하나도
+  안 보임)이거나, persona에 `"growth"` 센서가 없거나, 마지막 `speak()` 호출에
+  `"growth"` 값을 안 넣었으면 `0`을 돌려줍니다.
 - **`get_status_effect() -> list[StatusEffect]`**: 게임의 "상태이상"처럼, 지금
   활성화된 상태이상 문구를 담은 리스트를 돌려줍니다(판단 규칙은
   `planta_gochi/persona/status_effect.py`). `mood`와 마찬가지로 항상 **현재 state**

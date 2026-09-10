@@ -10,8 +10,9 @@ class ClassifyGrowthStageTests(unittest.TestCase):
             result = classify_growth_stage(ref["leaf_count"], ref["canopy_ratio"], ref["leaf_size_ratio"])
             self.assertEqual(result, stage)
 
-    def test_never_returns_5_even_for_extreme_values(self):
-        """5단계는 기준값이 아예 없으므로, 아무리 값이 크거나 작아도 1~4(혹은 leaf_count==0일 때 0)만 나와야 한다."""
+    def test_extreme_values_still_clamp_to_a_registered_stage(self):
+        """STAGE_REFERENCE_MEANS에 없는 값이 나와도(범위 밖), 등록된 단계 중 가장
+        가까운 것으로만 클램프되어야 한다 — 등록되지 않은 새 정수를 반환하면 안 된다."""
         extreme_cases = [
             (1, 0.0, 0.0),           # leaf_count는 0이 아니지만 관측치가 거의 없는 극단
             (500, 5.0, 5.0),         # 5단계보다 훨씬 더 "자란" 것처럼 보이는 극단
@@ -19,20 +20,32 @@ class ClassifyGrowthStageTests(unittest.TestCase):
         ]
         for leaf_count, canopy_ratio, leaf_size_ratio in extreme_cases:
             stage = classify_growth_stage(leaf_count, canopy_ratio, leaf_size_ratio)
-            self.assertIn(stage, (1, 2, 3, 4))
+            self.assertIn(stage, (1, 2, 3, 4, 5))
 
-    def test_far_beyond_stage_4_clamps_to_stage_4(self):
+    def test_far_beyond_stage_5_clamps_to_stage_5(self):
+        """가장 큰 값(현재 5단계)보다 훨씬 큰 값을 넣어도 5단계로 클램프된다."""
         stage = classify_growth_stage(1000, 10.0, 10.0)
-        self.assertEqual(stage, 4)
+        self.assertEqual(stage, 5)
 
     def test_far_below_stage_1_clamps_to_stage_1(self):
         """leaf_count가 0이 아닌 한, 아무리 작아도 0단계가 아니라 1단계로 클램프된다."""
         stage = classify_growth_stage(1, 0.0, 0.0)
         self.assertEqual(stage, 1)
 
-    def test_only_four_stages_are_registered(self):
-        """5단계 기준값이 실수로라도 들어가면 안 되므로, reference table 자체도 확인."""
-        self.assertEqual(set(STAGE_REFERENCE_MEANS.keys()), {1, 2, 3, 4})
+    def test_five_stages_are_registered(self):
+        """1~5단계 기준값이 전부 있는지, 실수로 더 늘거나 줄지 않았는지 확인."""
+        self.assertEqual(set(STAGE_REFERENCE_MEANS.keys()), {1, 2, 3, 4, 5})
+
+    def test_stage_5_continues_upward_trend_from_stage_4(self):
+        """1~4단계 사이엔 실측 노이즈로 완벽한 단조 증가가 아닌 지표가 이미 있었지만
+        (예: leaf_size_ratio는 1단계가 2단계보다 살짝 높음), 새로 추가된 5단계만큼은
+        4단계보다 세 지표 전부 커야 한다 — 값을 잘못 입력했으면 여기서 걸린다."""
+        stage4, stage5 = STAGE_REFERENCE_MEANS[4], STAGE_REFERENCE_MEANS[5]
+        for key in ("leaf_count", "canopy_ratio", "leaf_size_ratio"):
+            self.assertGreater(
+                stage5[key], stage4[key],
+                f"5단계의 {key}({stage5[key]})가 4단계({stage4[key]})보다 크지 않음",
+            )
 
     def test_leaf_count_zero_overrides_to_stage_0(self):
         """leaf_count가 정확히 0이면, canopy/leaf_size 값과 무관하게 항상 0단계다."""
@@ -46,10 +59,10 @@ class ClassifyGrowthStageTests(unittest.TestCase):
             self.assertEqual(stage, 0, f"leaf_count=0인데 stage={stage} (canopy={canopy_ratio}, leaf_size={leaf_size_ratio})")
 
     def test_leaf_count_one_does_not_trigger_zero_override(self):
-        """0단계 override는 정확히 leaf_count == 0일 때만 발동해야 한다 (1은 정상적으로 1~4단계 분류)."""
+        """0단계 override는 정확히 leaf_count == 0일 때만 발동해야 한다 (1은 정상적으로 1~5단계 분류)."""
         stage = classify_growth_stage(1, 0.3194, 0.0275)  # 1단계 평균과 거의 같은 canopy/leaf_size
         self.assertNotEqual(stage, 0)
-        self.assertIn(stage, (1, 2, 3, 4))
+        self.assertIn(stage, (1, 2, 3, 4, 5))
 
 
 class _StubZeroLeafAnalyzer:
@@ -64,13 +77,13 @@ class _StubZeroLeafAnalyzer:
 
 
 class GrowthStateMachineStageIntegrationTests(unittest.TestCase):
-    def test_growth_result_includes_stage_within_1_to_4(self):
+    def test_growth_result_includes_stage_within_1_to_5(self):
         persona = build_known_persona("상추")
         result = persona.update({"growth": "sample_easy.jpg"})
         growth = result["growth"]
 
         self.assertIn("stage", growth)
-        self.assertIn(growth["stage"], (1, 2, 3, 4))
+        self.assertIn(growth["stage"], (1, 2, 3, 4, 5))
 
         self.assertIn("raw_metrics", growth)
         self.assertIsInstance(growth["raw_metrics"]["leaf_count"], int)
