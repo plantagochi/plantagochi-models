@@ -25,6 +25,8 @@ class DiseaseStateMachine(StateEngine):
     에서 읽어 넘겨준다.
     """
 
+    accepts_image = True
+
     def __init__(
         self,
         state_prompts: dict,

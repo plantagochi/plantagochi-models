@@ -27,7 +27,19 @@ class Persona:
         각 센서에 대응하는 engine을 독립적으로 실행한 뒤,
         {"온도": {...detect_event 결과...}, "습도": {...}} 형태로 반환한다.
         Persona가 모르는 센서 이름은 무시한다.
+
+        예외적으로 "image" 키는 특정 센서 하나를 가리키지 않는다 — 이 persona가 가진
+        "이미지를 입력으로 받는" 엔진 전부(growth/disease 등, StateEngine.accepts_image
+        참고)에 같은 값을 동시에 넣어주는 fan-out 별칭이다. 즉
+            persona.update({"image": img})
+        는 growth/disease 센서가 둘 다 있는 persona라면
+            persona.update({"growth": img, "disease": img})
+        와 정확히 같은 결과를 낸다. 센서 이름을 직접 같이 넘기면(예:
+        {"image": img, "growth": other_img}) 그 명시적인 값이 "image"보다 우선한다.
+        기존처럼 센서 이름을 직접 쓰는 방식은 전혀 바뀌지 않는다 — "image"는 추가된
+        편의 기능일 뿐이다.
         """
+        sensor_values = self._expand_image_alias(sensor_values)
         results: Dict[str, dict] = {}
         for sensor_name, value in sensor_values.items():
             engine = self.engines.get(sensor_name)
@@ -35,6 +47,20 @@ class Persona:
                 continue
             results[sensor_name] = engine.detect_event(value)
         return results
+
+    def _expand_image_alias(self, sensor_values: Dict[str, Any]) -> Dict[str, Any]:
+        """"image" 키가 있으면, 그 값을 accepts_image인 모든 엔진의 센서 이름으로 복제해
+        넣은 새 dict를 돌려준다. "image"가 없으면 원본을 그대로 돌려준다(불필요한 복사
+        없음). 명시적으로 같이 넘긴 센서 값은 덮어쓰지 않는다."""
+        if "image" not in sensor_values:
+            return sensor_values
+
+        expanded = dict(sensor_values)
+        image_value = expanded.pop("image")
+        for sensor_name, engine in self.engines.items():
+            if getattr(engine, "accepts_image", False) and sensor_name not in expanded:
+                expanded[sensor_name] = image_value
+        return expanded
 
     def get_state(self) -> Dict[str, dict]:
         """

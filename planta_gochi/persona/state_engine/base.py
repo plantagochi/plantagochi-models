@@ -9,6 +9,13 @@ class StateEngine(ABC):
     Persona나 builder 쪽 코드를 건드릴 필요가 없다.
     """
 
+    #: detect_event(curr_value)가 이미지(sensory._image_io.ImageInput 형식)를 받는
+    #: 엔진이면 True로 오버라이드한다 (예: GrowthStateMachine, DiseaseStateMachine).
+    #: Persona.update()가 "image" 별칭 하나를 여러 이미지 기반 센서에 동시에 뿌려줄 때
+    #: 이 값으로 대상 엔진을 찾는다 — Persona가 구체적인 엔진 클래스를 몰라도 되도록
+    #: 하기 위한 마커라, 클래스 이름으로 분기하지 않는다.
+    accepts_image: bool = False
+
     @abstractmethod
     def detect_event(self, curr_value: Any) -> dict:
         """

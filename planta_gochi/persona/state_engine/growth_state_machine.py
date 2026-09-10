@@ -25,6 +25,8 @@ class GrowthStateMachine(StateEngine):
     제공한다(각 하위 엔진의 prompt/default_dialog가 이미 1개짜리 list이므로 그대로 연결).
     """
 
+    accepts_image = True
+
     def __init__(
         self,
         count_machine: DiscreteCountMachine,

@@ -26,10 +26,35 @@ for message in messages:
 `speak()`의 반환값은 **사용자에게 보여줄 짧은 글들을 담은 flat `list[str]`**입니다.
 어떤 센서에서 나온 문장인지 구분하지 않고, 화면에 표시할 여러 개의 글로 그대로 씁니다.
 
-`"growth"` 센서 값은 파일 경로에 국한되지 않습니다 — `sensor_values["growth"]`는
-가공 없이 그대로 `LeafAnalyzer.analyze()`에 전달되므로, [LeafAnalyzer가 지원하는 모든
-입력 형식](leaf_analyzer.md)(로컬 경로, http(s) URL, bytes/bytearray, `io.BytesIO`
-같은 file-like 객체, PIL Image, numpy array)을 그대로 쓸 수 있습니다.
+`"growth"`/`"disease"` 센서 값은 파일 경로에 국한되지 않습니다 — 가공 없이 그대로
+`LeafAnalyzer`/`DiseaseAnalyzer`의 `analyze()`에 전달되므로, [LeafAnalyzer가 지원하는
+모든 입력 형식](leaf_analyzer.md)(로컬 경로, http(s) URL, bytes/bytearray,
+`io.BytesIO` 같은 file-like 객체, PIL Image, numpy array)을 그대로 쓸 수 있습니다.
+
+### `"image"` — 이미지 센서 전부에 같은 사진 한 장 넣기
+
+카메라 한 대로 `growth`/`disease`를 동시에 판단하는 게 보통이라, 매번 같은 사진을
+두 번 적어 넣지 않아도 되도록 `"image"`라는 특별한 키를 지원합니다. `sensor_values`에
+`"image"`를 넣으면, persona가 가진 "이미지를 입력으로 받는" 센서(`accepts_image`가
+`True`인 엔진 — 지금은 `growth`/`disease`) 전부에 그 값이 동시에 들어갑니다.
+
+```python
+# 아래 두 줄은 완전히 같은 결과를 냅니다.
+ai.speak({"image": "sample_easy.jpg"})
+ai.speak({"growth": "sample_easy.jpg", "disease": "sample_easy.jpg"})
+```
+
+센서 이름을 명시적으로 같이 넘기면 그 값이 `"image"`보다 우선합니다(그 센서만 다른
+사진을 쓰고 싶을 때):
+
+```python
+# growth는 sample_hard.jpg, disease는 image로 넘긴 sample_easy.jpg를 쓴다.
+ai.speak({"image": "sample_easy.jpg", "growth": "sample_hard.jpg"})
+```
+
+기존처럼 `"growth"`/`"disease"`를 직접 쓰는 방식은 전혀 바뀌지 않았습니다 —
+`"image"`는 순전히 추가된 편의 기능입니다. 이미지를 받는 센서가 하나도 없는
+persona라면 `"image"` 키는 조용히 무시됩니다.
 
 ## 동작 방식
 
