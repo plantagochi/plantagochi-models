@@ -1,4 +1,4 @@
-# PlantAI (ai.speak / get_mood / get_growth_stage 사용법)
+# PlantAI (ai.speak / get_mood / get_growth_stage / get_status_effect 사용법)
 
 `PlantAI`는 `Persona`(state machine 기반 prompt/default_dialog)와 `LLMConnection`
 (OpenRouter 호출)을 묶어서, 센서 값을 넣으면 최종적으로 사용자에게 보여줄 짧은 대사
@@ -77,16 +77,16 @@ persona라면 `"image"` 키는 조용히 무시됩니다.
 6. `TrendStateMachine`이 아직 추세를 판단할 데이터가 부족한 동안(`INSUFFICIENT_DATA`)은
    애초에 `prompt`/`default_dialog`가 빈 `list`라 아무 메시지도 추가되지 않습니다.
 
-## get_mood() / get_growth_stage() — 표정/성장 단계 뽑기
+## get_mood() / get_growth_stage() / get_status_effect() — 표정/성장 단계/상태이상 뽑기
 
-`speak()`는 LLM을 호출하는 무거운 메서드입니다. UI 아바타 표정이나 성장 단계 표시처럼
-자주 갱신해야 하는 값은 LLM 없이 `get_mood()`/`get_growth_stage()`로 바로 뽑을 수
-있습니다.
+`speak()`는 LLM을 호출하는 무거운 메서드입니다. UI 아바타 표정이나 성장 단계, 상태이상
+표시처럼 자주 갱신해야 하는 값은 LLM 없이 `get_mood()`/`get_growth_stage()`/
+`get_status_effect()`로 바로 뽑을 수 있습니다.
 
 **persona state를 실제로 갱신하는(=`persona.update()`를 부르는) 메서드는 `speak()`
-하나뿐입니다.** `get_mood()`/`get_growth_stage()`는 인자를 받지 않는 순수 read
-메서드로, `speak()`가 마지막으로 갱신해둔 결과를 읽기만 합니다 — 그래서 둘 다 몇 번을
-불러도 state machine에는 아무 영향이 없고, `speak()`를 다시 부르기 전까지는 항상 같은
+하나뿐입니다.** `get_mood()`/`get_growth_stage()`/`get_status_effect()`는 인자를 받지
+않는 순수 read 메서드로, `speak()`가 마지막으로 갱신해둔 결과를 읽기만 합니다 — 그래서
+셋 다 몇 번을 불러도 state machine에는 아무 영향이 없고, `speak()`를 다시 부르기 전까지는 항상 같은
 값을 돌려줍니다.
 
 ```python
