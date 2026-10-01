@@ -10,6 +10,7 @@ from planta_gochi.llm.connection import LLMConnection
 from planta_gochi.persona.mood import Expression, extract_expression
 from planta_gochi.persona.persona import Persona
 from planta_gochi.persona.status_effect import StatusEffect, extract_status_effects
+from planta_gochi.persona.supported_achivements import SupportedAchivements
 
 
 class PlantAI:
@@ -49,11 +50,18 @@ class PlantAI:
         self._last_result = self.persona.update(sensor_values)
         results = self._last_result
 
-        situations = {sensor_name: result["prompt"] for sensor_name, result in results.items()}
+        # results에는 센서별 detect_event() 결과 외에 "achievements"(list) 같은 센서가
+        # 아닌 키도 섞여 들어올 수 있으므로(Persona.update() 참고), persona가 실제로
+        # 아는 센서 이름만 걸러서 LLM에 넘길 situations/최종 messages를 만든다.
+        sensor_results = {
+            sensor_name: result for sensor_name, result in results.items() if sensor_name in self.persona.engines
+        }
+
+        situations = {sensor_name: result["prompt"] for sensor_name, result in sensor_results.items()}
         reply = self.llm.ask_batch(self.persona.name, situations)
 
         messages: List[str] = []
-        for sensor_name, result in results.items():
+        for sensor_name, result in sensor_results.items():
             if reply is not None and sensor_name in reply:
                 messages.append(reply[sensor_name])
             else:
@@ -101,3 +109,19 @@ class PlantAI:
         RuntimeError.
         """
         return extract_status_effects(self._require_last_result())
+
+    def get_achievements(self) -> List[SupportedAchivements]:
+        """
+        지금까지 달성한 achievement(planta_gochi.persona.supported_achivements 참고)
+        누적 목록을 돌려준다. 판단 로직은 planta_gochi.persona.achievement의
+        AchievementTracker가 speak()가 부르는 persona.update() 호출마다 관찰해서 쌓는다.
+
+        get_mood()/get_growth_stage()/get_status_effect()와 달리 "마지막 한 틱의
+        결과"가 아니라 Persona가 생애 동안 계속 누적해온 값을 그대로 위임해서 읽기
+        때문에, speak()를 아직 한 번도 호출하지 않았어도 RuntimeError 없이 빈 리스트를
+        돌려준다(아직 아무것도 달성 못 했을 뿐이다).
+
+        휘발성(volatile)이다 — Persona.get_state()/load_state()로는 저장/복원되지
+        않으므로, 프로세스를 새로 시작하면 achievement는 전부 초기화된다.
+        """
+        return self.persona.get_achievements()

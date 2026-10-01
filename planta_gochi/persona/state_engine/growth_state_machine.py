@@ -10,8 +10,8 @@ from planta_gochi.sensory import LeafAnalyzer
 
 class GrowthStateMachine(StateEngine):
     """
-    LeafAnalyzer(YOLO 기반 vision model) + TrendStateMachine(캐노피 전체 크기 / 개별 잎 크기
-    추세) x2 + DiscreteCountMachine(잎 개수)을 하나로 묶은 합성 state machine.
+    LeafAnalyzer(YOLO 기반 vision model) + TrendStateMachine(캐노피 전체 크기 / 개별 잎 크기추세) 2개
+      + DiscreteCountMachine(잎 개수)을 하나로 묶은 합성 state machine.
 
     다른 dimension(온도/습도)의 LinearStateMachine이 raw 센서 값(숫자)을 detect_event()로
     받아서 그 안에서 알아서 내부 state를 갱신하는 것과 똑같은 사용 패턴을, vision

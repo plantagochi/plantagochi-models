@@ -83,7 +83,7 @@ class ImageAliasFanOutTests(unittest.TestCase):
             "disease": "sample_easy.jpg",
         })
 
-        self.assertEqual(set(alias_result.keys()), {"growth", "disease"})
+        self.assertEqual(set(alias_result.keys()), {"growth", "disease", "achievements"})
         self.assertEqual(set(alias_result.keys()), set(direct_result.keys()))
         self.assertEqual(
             alias_result["growth"]["leaf_count"]["count"],
@@ -109,17 +109,20 @@ class ImageAliasFanOutTests(unittest.TestCase):
     def test_legacy_direct_sensor_names_still_work_unchanged(self):
         persona = build_known_persona("상추")
         result = persona.update({"temperature": 20, "growth": "sample_easy.jpg"})
-        self.assertEqual(set(result.keys()), {"temperature", "growth"})
+        self.assertEqual(set(result.keys()), {"temperature", "growth", "achievements"})
 
     def test_image_alias_can_mix_with_numeric_sensors(self):
         persona = build_known_persona("상추")
         result = persona.update({"temperature": 20, "image": "sample_easy.jpg"})
-        self.assertEqual(set(result.keys()), {"temperature", "growth", "disease"})
+        self.assertEqual(set(result.keys()), {"temperature", "growth", "disease", "achievements"})
 
     def test_image_alias_is_noop_when_no_engine_accepts_image(self):
+        """achievements 키는 센서가 하나도 없어도 Persona.update()가 항상 붙여주므로
+        여전히 남는다 — "이미지 센서로 인한 부수 효과가 없다"는 의미로, 결과가
+        완전히 빈 dict가 된다는 뜻은 아니다."""
         persona = Persona(name="테스트", engines={})
         result = persona.update({"image": "sample_easy.jpg"})
-        self.assertEqual(result, {})
+        self.assertEqual(result, {"achievements": []})
 
     def test_update_without_image_key_is_untouched(self):
         """"image" 키가 아예 없는 sensor_values는 _expand_image_alias가 손대지 않고

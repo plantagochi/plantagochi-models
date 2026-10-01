@@ -43,3 +43,7 @@ print()
 print("mood:", ai.get_mood())
 print("growth_stage:", ai.get_growth_stage())
 print("status_effect:", ai.get_status_effect())
+
+# get_achievements()는 위 셋과 달리 "마지막 한 틱"이 아니라 lettuce가 생애 동안(위
+# readings 루프 포함) 쌓아온 누적 목록이다 — speak()를 안 불러도 값이 쌓인다.
+print("achievements:", ai.get_achievements())

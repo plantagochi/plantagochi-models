@@ -1,6 +1,8 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
+from planta_gochi.persona.achievement import AchievementTracker
 from planta_gochi.persona.state_engine import StateEngine
+from planta_gochi.persona.supported_achivements import SupportedAchivements
 
 
 class Persona:
@@ -20,6 +22,10 @@ class Persona:
     def __init__(self, name: str, engines: Dict[str, StateEngine]):
         self.name = name
         self.engines = engines
+        # achievement는 센서 state와 다른 층위(게임적/UI)의 휘발성 상태라 engines에
+        # 섞지 않고 별도로 들고 있는다 — get_state()/load_state() 대상에서도 제외된다
+        # (AchievementTracker/supported_achivements.py 참고).
+        self._achievement_tracker = AchievementTracker()
 
     def update(self, sensor_values: Dict[str, Any]) -> Dict[str, dict]:
         """
@@ -38,6 +44,10 @@ class Persona:
         {"image": img, "growth": other_img}) 그 명시적인 값이 "image"보다 우선한다.
         기존처럼 센서 이름을 직접 쓰는 방식은 전혀 바뀌지 않는다 — "image"는 추가된
         편의 기능일 뿐이다.
+
+        반환 dict에는 센서 이름 키들 외에 "achievements" 키도 항상 포함된다 — 지금까지
+        (이 Persona 인스턴스 생애 동안) 달성한 achievement 누적 목록이다(get_achievements()
+        참고). 이번 틱에 새로 달성한 것만 담는 게 아니라 매번 전체 누적 목록을 담는다.
         """
         sensor_values = self._expand_image_alias(sensor_values)
         results: Dict[str, dict] = {}
@@ -46,7 +56,20 @@ class Persona:
             if engine is None:
                 continue
             results[sensor_name] = engine.detect_event(value)
+
+        self._achievement_tracker.observe(sensor_values, results)
+        results["achievements"] = self._achievement_tracker.unlocked()
         return results
+
+    def get_achievements(self) -> List[SupportedAchivements]:
+        """
+        지금까지 달성한 achievement 누적 목록을, 상태를 바꾸지 않고 읽기만 한다 —
+        update()가 매번 담아주는 "achievements" 키와 항상 같은 값이다. 휘발성이라
+        get_state()/load_state()로는 저장/복원되지 않는다: 프로세스를 새로 시작하거나
+        저장된 state를 불러오면 achievement는 전부 초기화된다(AchievementTracker
+        docstring 참고).
+        """
+        return self._achievement_tracker.unlocked()
 
     def _expand_image_alias(self, sensor_values: Dict[str, Any]) -> Dict[str, Any]:
         """"image" 키가 있으면, 그 값을 accepts_image인 모든 엔진의 센서 이름으로 복제해

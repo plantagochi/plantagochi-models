@@ -1,4 +1,4 @@
-# PlantAI (ai.speak / get_mood / get_growth_stage / get_status_effect 사용법)
+# PlantAI (ai.speak / get_mood / get_growth_stage / get_status_effect / get_achievements 사용법)
 
 `PlantAI`는 `Persona`(state machine 기반 prompt/default_dialog)와 `LLMConnection`
 (OpenRouter 호출)을 묶어서, 센서 값을 넣으면 최종적으로 사용자에게 보여줄 짧은 대사
@@ -139,7 +139,70 @@ effects = ai.get_status_effect()    # 마찬가지
 
 `speak()`를 한 번도 호출하지 않은 상태에서 `get_mood()`/`get_growth_stage()`/
 `get_status_effect()`를 부르면 `RuntimeError`가 납니다 — 아직 읽을 결과가 없다는
-뜻입니다.
+뜻입니다. (`get_achievements()`는 예외입니다 — 아래 참고.)
+
+## get_achievements() — 게임적 "업적" 뽑기
+
+지금까지 이 `Persona` 인스턴스가 달성한 achievement(`planta_gochi.persona.
+supported_achivements.SupportedAchivements`) 누적 목록을 돌려줍니다.
+
+```python
+ai.speak({"temperature": 40})  # 극단 고온
+ai.speak({"temperature": 20})  # 정상 범위로 복구
+
+print(ai.get_achievements())
+# [<SupportedAchivements.SUDDEN_ENVIRONMENT_SHIFT: '식물이 죽는다고!!'>]
+```
+
+**다른 `get_*()`와 다른 점 — "마지막 한 틱"이 아니라 계속 쌓이는 값입니다.**
+`get_mood()`/`get_growth_stage()`/`get_status_effect()`는 방금 `speak()`가 갱신한
+결과 하나만 보고 매번 새로 계산하지만, achievement는 "지금까지 한 번이라도 조건을
+만족한 적 있는가"를 기억해야 합니다. 그래서:
+
+- `persona.update(sensor_values)`(따라서 `speak()`)를 부를 때마다 그 안에서
+  `AchievementTracker`가 결과를 관찰하고, 새로 조건을 만족한 게 있으면 누적 집합에
+  더합니다. 이미 달성한 건 조건이 더 이상 사실이 아니게 되어도 사라지지 않습니다.
+- `Persona.update()`의 반환 dict에는 센서 이름 키들과 나란히 `"achievements"` 키가
+  항상 들어 있습니다 — 그 시점까지의 전체 누적 목록입니다(이번 틱에 새로 달성한 것만
+  담는 게 아닙니다).
+- `PlantAI.get_achievements()`는 `persona.get_achievements()`를 그대로 위임해서
+  읽기만 합니다. 그래서 다른 `get_*()`와 달리 **`speak()`를 한 번도 안 불렀어도
+  `RuntimeError` 없이 빈 리스트를 돌려줍니다** — LLM 결과(`_last_result`)가 아니라
+  `Persona`가 스스로 들고 있는 누적 상태를 읽는 것이기 때문입니다. `persona.update()`를
+  (`speak()`를 거치지 않고) 직접 불러도 똑같이 누적됩니다.
+
+**휘발성(volatile)입니다.** `Persona.get_state()`/`load_state()`로는 achievement가
+전혀 저장/복원되지 않습니다 — state를 저장했다가 새 프로세스에서 다시 불러오면
+achievement는 전부 초기화됩니다. 센서 값을 이어가기 위한 "진짜 상태"와는 다른 층위의
+게임적/UI 개념이라 의도적으로 분리했습니다.
+
+**지금 지원하는 achievement 9종**(`SupportedAchivements` 정의 순서, 판단 로직은
+`planta_gochi/persona/achievement.py` 참고):
+
+| 이름 | 조건 |
+|---|---|
+| 살려야한다 | 서로 다른 상태이상 3종을 각각 정상으로 복구 |
+| 트러플 바이옴? 아직 하드모드도 아니야! | 곰팡이성 질병 완치 |
+| 난 나보다 약한 세균의 명령따위 듣지 않는다. | 세균성 질병 완치 |
+| 아무에게도 말하지 마라! | 성장 단계가 한 틱 사이에 2단계 이상 점프 ⚠️ |
+| 이제 가망이 없어 | 성장 5단계 도달 |
+| 식물이 죽는다고!! | 환경 센서(temperature/humidity/soil_temp/soil_humidity) 중 하나가 한 틱 사이에 2밴드 이상 점프 |
+| Too much water | 공기 습도가 `VALUE_CRITICAL_HIGH`(상추 기준 90% 이상)에 도달 |
+| 올빼미 농부 | 자정~새벽 4시 사이에 soil_humidity가 직전 관측값보다 상승(물주기로 추론) |
+| Touch grass | growth의 캐노피 비율(`raw_metrics.canopy_ratio`)이 50% 이상 |
+
+**⚠️ "아무에게도 말하지 마라!"의 알려진 한계**: `stage`는 canopy/leaf_size와 달리
+`TrendStateMachine`으로 스무딩되지 않고, 그 프레임의 raw 지표로 `classify_growth_stage()`를
+매번 새로 돌린 값입니다(`GrowthStateMachine` 참고). 그래서 실제로 며칠에 걸쳐 급성장한
+경우뿐 아니라, 연속된 두 사진의 세그멘테이션 노이즈(각도/조명 차이 등)만으로 stage가
+한 틱 만에 2단계 이상 튀면서 이 achievement가 터질 수 있습니다. 지금은 그대로 두고
+한계로만 문서화하기로 확인했습니다(2026-09-29 대화) — 더 엄격하게 하려면 `stage`
+자체에도 `DiscreteCountMachine`류의 debounce(`confirm_streak`)를 추가해 "확정된
+stage"끼리 비교하는 방법이 있습니다.
+
+**"위기 대응 전문가"(상태이상 알림 후 30분 이내 정상 복구)는 아직 없습니다.** 다른
+9개와 달리 "이번 틱에 이벤트 한 번"이 아니라 경과 시간을 추적해야 해서 성격이 다르고,
+지금 단계에서는 보류하기로 했습니다.
 
 ## 실패 지점 확인하기 (stderr 경고)
 
