@@ -60,8 +60,8 @@ from typing import Any, Callable, Dict, List, Optional, Set
 from planta_gochi.persona.state_engine import DiseaseEvents, DiseaseState, LinearState
 from planta_gochi.persona.status_effect import (
     StatusEffect,
-    _DISEASE_STATUS_EFFECTS,
-    _LINEAR_CRITICAL_STATUS_EFFECTS,
+    DISEASE_STATUS_EFFECTS,
+    LINEAR_CRITICAL_STATUS_EFFECTS,
 )
 from planta_gochi.persona.supported_achivements import SupportedAchivements
 
@@ -123,7 +123,7 @@ class AchievementTracker:
         if SupportedAchivements.STATUS_RECOVERY_TRIO in self._unlocked:
             return  # 이미 달성했으면 더 볼 필요 없음
 
-        for sensor_name, effect_table in _LINEAR_CRITICAL_STATUS_EFFECTS.items():
+        for sensor_name, effect_table in LINEAR_CRITICAL_STATUS_EFFECTS.items():
             result = results.get(sensor_name)
             if result is None or "raw_event" not in result:
                 continue
@@ -139,7 +139,7 @@ class AchievementTracker:
             raw_event = disease_result["raw_event"]
             if raw_event in (DiseaseEvents.BACTERIAL_TO_HEALTHY, DiseaseEvents.FUNGAL_TO_HEALTHY):
                 prev_state = DiseaseState(raw_event.value // 10)
-                effect = _DISEASE_STATUS_EFFECTS.get(prev_state)
+                effect = DISEASE_STATUS_EFFECTS.get(prev_state)
                 if effect is not None:
                     self._recovered_effect_types.add(effect)
 

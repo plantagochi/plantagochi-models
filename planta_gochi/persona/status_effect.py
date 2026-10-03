@@ -39,7 +39,7 @@ class StatusEffect(str, Enum):
     ROOTS_PARCHED = "메마른뿌리"
 
 
-_DISEASE_STATUS_EFFECTS = {
+DISEASE_STATUS_EFFECTS = {
     DiseaseState.BACTERIAL: StatusEffect.BACTERIAL_INFECTION,
     DiseaseState.FUNGAL: StatusEffect.FUNGAL_INFECTION,
     # HEALTHY는 의도적으로 매핑에 없음 -> 상태이상 없음
@@ -47,7 +47,7 @@ _DISEASE_STATUS_EFFECTS = {
 
 # 센서 이름마다 "critical 구간 state -> 상태이상"만 담는다. VALUE_LOW/VALUE_HIGH/
 # VALUE_MID는 어디에도 없으므로 자동으로 상태이상 취급되지 않는다.
-_LINEAR_CRITICAL_STATUS_EFFECTS = {
+LINEAR_CRITICAL_STATUS_EFFECTS = {
     "temperature": {
         LinearState.VALUE_CRITICAL_HIGH: StatusEffect.SCORCHING_TEMPERATURE,
         LinearState.VALUE_CRITICAL_LOW: StatusEffect.FREEZING_TEMPERATURE,
@@ -78,11 +78,11 @@ def extract_status_effects(persona_result: Dict[str, dict]) -> List[StatusEffect
 
     disease_result = persona_result.get("disease")
     if disease_result is not None and "state" in disease_result:
-        effect = _DISEASE_STATUS_EFFECTS.get(disease_result["state"])
+        effect = DISEASE_STATUS_EFFECTS.get(disease_result["state"])
         if effect is not None:
             effects.append(effect)
 
-    for sensor_name, state_effects in _LINEAR_CRITICAL_STATUS_EFFECTS.items():
+    for sensor_name, state_effects in LINEAR_CRITICAL_STATUS_EFFECTS.items():
         result = persona_result.get(sensor_name)
         if result is None or "state" not in result:
             continue
@@ -91,3 +91,40 @@ def extract_status_effects(persona_result: Dict[str, dict]) -> List[StatusEffect
             effects.append(effect)
 
     return effects
+
+
+class StatusEffectState(str, Enum):
+    ACTIVE = "active"
+    CLEARED = "cleared"
+    UNKNOWN = "unknown"
+
+
+def extract_every_status_effects(persona_result: Dict[str, dict]) -> Dict[StatusEffect, StatusEffectState]:
+    """
+    persona.update()가 돌려준 dict로부터 모든 StatusEffect의 상태를 3값으로 돌려준다.
+
+    - ACTIVE: 이번 결과에서 해당 센서/질병이 그 상태이상의 원인 state에 있다.
+    - CLEARED: 원인 센서/질병을 이번에 관측했고, 그 상태이상의 원인 state가 아니다(해소됨).
+    - UNKNOWN: 이번 결과에 원인 센서/질병이 없다. 해소된 것이 아니라 이번에는 모르는 것이다.
+
+    extract_status_effects()와 달리 "관측 안 됨"을 해소와 구분해서 드러내는 함수다.
+    Persona/엔진 상태를 건드리지 않는 순수 함수다.
+    """
+    states: Dict[StatusEffect, StatusEffectState] = {effect: StatusEffectState.UNKNOWN for effect in StatusEffect}
+
+    disease_result = persona_result.get("disease")
+    if disease_result is not None and "state" in disease_result:
+        current = disease_result["state"]
+        for state, effect in DISEASE_STATUS_EFFECTS.items():
+            states[effect] = StatusEffectState.ACTIVE if state == current else StatusEffectState.CLEARED
+
+    for sensor_name, effect_table in LINEAR_CRITICAL_STATUS_EFFECTS.items():
+        result = persona_result.get(sensor_name)
+        if result is None or "state" not in result:
+            continue
+        current = result["state"]
+        for state, effect in effect_table.items():
+            states[effect] = StatusEffectState.ACTIVE if state == current else StatusEffectState.CLEARED
+
+    return states
+

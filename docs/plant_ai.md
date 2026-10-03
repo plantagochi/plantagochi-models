@@ -140,6 +140,28 @@ effects = ai.get_status_effect()    # 마찬가지
   상태이상도 없으면 빈 리스트입니다. `StatusEffect`도 `Expression`처럼 `(str, Enum)`이라
   그 자체로 문자열처럼 쓸 수 있습니다(`.value`로 순수 문자열도 꺼낼 수 있음).
 
+**관측 안 됨과 해소됨을 구분하고 싶다면 `extract_every_status_effects()`를 쓰세요.**
+`get_status_effect()`/`extract_status_effects()`는 활성인 것만 돌려주므로, 이번 결과에
+없는 센서의 상태이상은 목록에서 빠질 뿐 "해소됐다"는 뜻이 아닙니다. 이 함수는 모든
+`StatusEffect`를 `StatusEffectState` 3값으로 돌려줍니다(`planta_gochi.persona.status_effect`).
+
+- `ACTIVE`: 이번 결과에서 원인 센서/질병이 그 상태이상의 state에 있다.
+- `CLEARED`: 원인 센서/질병을 이번에 관측했고, 그 state가 아니다(해소됨).
+- `UNKNOWN`: 이번 결과에 원인 센서/질병이 없다. 해소된 게 아니라 모르는 것이다.
+
+```python
+from planta_gochi.persona.status_effect import StatusEffect, StatusEffectState, extract_every_status_effects
+
+result = persona.update({"temperature": 40})   # humidity 등은 관측하지 않음
+states = extract_every_status_effects(result)
+states[StatusEffect.SCORCHING_TEMPERATURE]      # StatusEffectState.ACTIVE
+states[StatusEffect.FREEZING_TEMPERATURE]       # StatusEffectState.CLEARED
+states[StatusEffect.JUNGLE_HUMIDITY]            # StatusEffectState.UNKNOWN
+```
+
+입력은 `persona.update()`가 돌려준 dict입니다. `PlantAI`에는 아직 이 3값 조회 메서드가
+없습니다 — `PlantAI`를 통해 쓰려면 마지막 결과를 읽는 메서드를 따로 추가해야 합니다.
+
 `speak()`를 한 번도 호출하지 않은 상태에서 `get_mood()`/`get_growth_stage()`/
 `get_status_effect()`를 부르면 `RuntimeError`가 납니다 — 아직 읽을 결과가 없다는
 뜻입니다. (`get_achievements()`는 예외입니다 — 아래 참고.)
