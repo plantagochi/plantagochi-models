@@ -47,7 +47,7 @@ int/float/str/bool/None/list/dict로만 이루어져 있어 `json.dumps()`에 �
 | `LinearStateMachine` (온도/습도/토양온도/토양습도) | `prev_value` | 원본 센서 값 그대로 (숫자) |
 | `DiscreteCountMachine` (leaf_count) | `confirmed_count`, `candidate_count`, `streak` | 전부 스칼라 int |
 | `TrendStateMachine` (canopy/leaf_size 추세) | `ema`, `prev_state`(int), `raw_history`, `smoothed_history` | ⚠️ 아래 참고 |
-| `GrowthStateMachine` (growth) | `count_machine`, `canopy_machine`, `leaf_size_machine` | 위 두 엔진의 state를 그대로 묶은 것 |
+| `GrowthStateMachine` (growth) | `count_machine`, `canopy_machine`, `leaf_size_machine` | 위 두 엔진의 state를 그대로 묶은 것. 추세 머신은 JSON에 `trend_machine` 섹션이 없으면 조립되지 않고, 그때는 `count_machine`만 남는다 |
 | `DiseaseStateMachine` (disease) | `confirmed_state`(int), `candidate_state`(int), `streak` | 전부 스칼라. `DiscreteCountMachine`과 같은 debounce 구조라 모양도 같음 |
 
 ### ⚠️ 배열형 필드: `raw_history` / `smoothed_history`

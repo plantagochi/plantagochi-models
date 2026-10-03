@@ -162,9 +162,8 @@ print(ai.get_achievements())
 - `persona.update(sensor_values)`(따라서 `speak()`)를 부를 때마다 그 안에서
   `AchievementTracker`가 결과를 관찰하고, 새로 조건을 만족한 게 있으면 누적 집합에
   더합니다. 이미 달성한 건 조건이 더 이상 사실이 아니게 되어도 사라지지 않습니다.
-- `Persona.update()`의 반환 dict에는 센서 이름 키들과 나란히 `"achievements"` 키가
-  항상 들어 있습니다 — 그 시점까지의 전체 누적 목록입니다(이번 틱에 새로 달성한 것만
-  담는 게 아닙니다).
+- `persona.update()`는 achievement를 **관찰만** 하고 반환값에는 담지 않습니다. 읽는 방법은
+  `get_achievements()` 하나뿐입니다.
 - `PlantAI.get_achievements()`는 `persona.get_achievements()`를 그대로 위임해서
   읽기만 합니다. 그래서 다른 `get_*()`와 달리 **`speak()`를 한 번도 안 불렀어도
   `RuntimeError` 없이 빈 리스트를 돌려줍니다** — LLM 결과(`_last_result`)가 아니라

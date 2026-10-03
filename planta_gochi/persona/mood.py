@@ -186,8 +186,10 @@ def _growth_expression(growth_result: dict) -> Expression:
     합친다. 부정적 신호가 2개 이상이면 무조건 DISTRESSED, 그 외에는 세 후보 중 가장
     심각한 Expression을 고른다."""
     count_event = growth_result["leaf_count"]["raw_event"]
-    canopy_state = growth_result["canopy_trend"]["state"]
-    leaf_size_state = growth_result["leaf_size_trend"]["state"]
+    # 추세 머신이 조립되지 않은 growth(JSON에 trend_machine 없음)는 해당 키가 없으므로,
+    # 없는 신호는 중립(None)으로 보고 부정 카운트나 후보에서 빠지게 한다.
+    canopy_state = growth_result.get("canopy_trend", {}).get("state")
+    leaf_size_state = growth_result.get("leaf_size_trend", {}).get("state")
 
     negative_count = (
         (count_event in _GROWTH_NEGATIVE_COUNT_EVENTS)

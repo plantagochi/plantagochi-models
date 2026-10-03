@@ -187,11 +187,13 @@ class AchievementTrackerUnitTests(unittest.TestCase):
 
 
 class PersonaAchievementIntegrationTests(unittest.TestCase):
-    def test_update_result_always_includes_achievements_key(self):
+    def test_update_result_never_exposes_achievements(self):
+        """update()는 관찰만 하고, achievement는 get_achievements()로만 읽는다."""
         persona = build_known_persona("상추")
-        result = persona.update({"temperature": 20, "humidity": 60})
-        self.assertIn("achievements", result)
-        self.assertEqual(result["achievements"], [])
+        persona.update({"temperature": 40})
+        result = persona.update({"temperature": 20})
+        self.assertNotIn("achievements", result)
+        self.assertNotEqual(persona.get_achievements(), [])
 
     def test_get_achievements_matches_update_without_changing_state(self):
         persona = build_known_persona("상추")
@@ -202,8 +204,8 @@ class PersonaAchievementIntegrationTests(unittest.TestCase):
         via_get_again = persona.get_achievements()
         self.assertEqual(via_get, via_get_again)
 
-        result = persona.update({"temperature": 20})  # 같은 값 반복: 이벤트 없음
-        self.assertEqual(result["achievements"], persona.get_achievements())
+        persona.update({"temperature": 20})  # 같은 값 반복: 이벤트 없음
+        self.assertEqual(persona.get_achievements(), via_get)
 
     def test_achievements_are_not_part_of_get_state_or_load_state(self):
         """휘발성 요구사항: get_state()/load_state()에는 achievement가 전혀 등장하지 않는다."""
@@ -250,7 +252,7 @@ class PlantAIAchievementTests(unittest.TestCase):
         self.assertNotEqual(ai.get_achievements(), [])
 
     def test_speak_still_works_with_achievements_key_present(self):
-        """achievements 키가 섞여 있어도 speak()의 situations/messages 조립이 깨지지
+        """achievement 관찰이 끼어 있어도 speak()의 situations/messages 조립이 깨지지
         않아야 한다(센서가 아닌 키를 걸러내는 로직 회귀 테스트)."""
         persona = build_known_persona("상추")
         ai = PlantAI(persona, llm=_StubLLM())

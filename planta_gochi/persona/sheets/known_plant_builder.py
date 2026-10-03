@@ -51,9 +51,10 @@ default_dialog는 LLM에 접속할 수 없을 때 대신 사용자에게 그대�
 default_dialog는 state_prompts/event_prompts에 있는 모든 state/event를 빠짐없이
 커버해야 하며, 하나라도 빠지면 builder가 조립 시점에 바로 에러를 낸다.
 
-"growth" 타입은 leaf_count(DiscreteCountMachine)와 canopy/leaf_size 추세(각각
-독립된 TrendStateMachine 인스턴스, 문구는 trend_machine 섹션 하나를 공유)를 묶은
-GrowthStateMachine을 만든다. leaf_analyzer는 생략하면 기본 backend("onnx")로 생성된다.
+"growth" 타입은 leaf_count(DiscreteCountMachine)를 기본으로 묶은 GrowthStateMachine을
+만든다. JSON에 "trend_machine" 섹션이 있으면 canopy/leaf_size 추세(각각 독립된
+TrendStateMachine 인스턴스, 문구는 그 섹션 하나를 공유)도 함께 붙고, 없으면 추세 없이
+leaf_count만으로 조립된다. leaf_analyzer는 생략하면 기본 backend("onnx")로 생성된다.
 
 "disease" 타입은 DiseaseAnalyzer(bacterial/fungal/healthy 3-클래스 분류기)를
 DiscreteCountMachine과 같은 debounce 구조로 감싼 DiseaseStateMachine을 만든다 —
@@ -189,10 +190,13 @@ def _build_discrete_count_machine(spec: dict) -> DiscreteCountMachine:
 def build_growth_state_machine(spec: dict) -> GrowthStateMachine:
     leaf_analyzer_spec = spec.get("leaf_analyzer", {})
     count_machine = _build_discrete_count_machine(spec["count_machine"])
-    # canopy/leaf_size는 같은 trend_machine 문구를 공유하되, 서로 다른 값을 추적해야
-    # 하므로(각자 자기 history/EMA를 들고 있어야 함) 반드시 별도 인스턴스로 만든다.
-    canopy_machine = _build_trend_state_machine(spec["trend_machine"])
-    leaf_size_machine = _build_trend_state_machine(spec["trend_machine"])
+    canopy_machine = None
+    leaf_size_machine = None
+    if "trend_machine" in spec:
+        # canopy/leaf_size는 같은 trend_machine 문구를 공유하되, 서로 다른 값을 추적해야
+        # 하므로(각자 자기 history/EMA를 들고 있어야 함) 반드시 별도 인스턴스로 만든다.
+        canopy_machine = _build_trend_state_machine(spec["trend_machine"])
+        leaf_size_machine = _build_trend_state_machine(spec["trend_machine"])
 
     return GrowthStateMachine(
         count_machine=count_machine,
