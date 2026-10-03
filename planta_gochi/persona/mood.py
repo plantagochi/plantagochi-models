@@ -27,8 +27,8 @@ mood_key -> Expression 매핑은 종(species)과 무관하게 앱 전체에서 �
 
 growth의 특수 규칙
 -------------------
-growth는 leaf_count/canopy_trend/leaf_size_trend 세 개를 이미 합성한 결과라 mood
-후보도 셋에서 나온다. 이 세 신호 중 "부정적인" 신호(잎 감소/캐노피 축소/개별 잎 축소)가
+growth는 leaf_count와(있다면) canopy_trend/leaf_size_trend를 합성한 결과라 mood
+후보도 그 신호들에서 나온다. 추세 머신이 없는 growth는 leaf_count 신호만 있다. 이 세 신호 중 "부정적인" 신호(잎 감소/캐노피 축소/개별 잎 축소)가
 2개 이상이면 growth 전체를 DISTRESSED로 본다(팀 합의: 하나만 나빠지는 건 대세에
 지장이 없는 노이즈로 보고, 두 개 이상 동시에 나빠질 때만 진짜 위험 신호로 취급).
 그래서 "부정적" 개별 신호(leaf_loss, wilting) 자체는 mood_key -> Expression에서

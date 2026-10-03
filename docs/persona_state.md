@@ -28,7 +28,7 @@ restored.update({"temperature": 21, "humidity": 58, "growth": "sample_easy.jpg"}
 `load_state()`는 **Persona/엔진이 이미 만들어져 있다고 가정**하고 그 위에 동적 값만
 덮어씁니다. thresholds나 prompt 문구 같은 정적 설정은 `get_state()`에 포함되지
 않습니다 — 그런 설정은 `known_plant_builder`가 종별 JSON(예: `상추.json`)에서 다시
-만들어주므로 굳이 같이 저장할 필요가 없습니다. 즉 저장/복원 순서는 항상:
+만들어주므로 굳이 같이 저장할 필요가 없습니다. 조립 방법은 [`persona_builder.md`](persona_builder.md)를 참고하세요. 즉 저장/복원 순서는 항상:
 
 1. `build_known_persona(...)` 등으로 Persona를 (다시) 조립
 2. 저장해둔 state가 있으면 `load_state(state)`로 얹기
@@ -60,7 +60,7 @@ int/float/str/bool/None/list/dict로만 이루어져 있어 `json.dumps()`에 �
 - `raw_history`: 최대 `window * 3`개 (기본 window=7 → 최대 21개)
 - `smoothed_history`: 최대 `window`개 (기본 7개)
 
-`growth` 센서를 쓰는 경우, state 예시는 이런 모양입니다:
+추세 머신이 조립된 growth(`상추_trend` 등, [`persona_builder.md`](persona_builder.md) 참고)를 쓰는 경우 state 예시는 이런 모양입니다. 추세 머신이 없는 종(`상추`)은 `count_machine`만 나옵니다:
 
 ```jsonc
 {

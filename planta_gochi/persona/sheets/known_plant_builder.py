@@ -5,7 +5,7 @@ main.py에서는 LinearStateMachine 하나를 코드로 직접 조립했지만, 
 온도/습도 등 센서별 프롬프트가 다르기 때문에 그 내용을 JSON으로 분리해두고,
 이 파일이 JSON을 읽어 state machine들을 만든 뒤 Persona로 묶어준다.
 
-JSON spec 형태 (known_plants/상추.json 참고):
+JSON spec 형태 (known_plants/ 아래 종 파일 참고):
 {
     "name": "상추",
     "sensors": {
@@ -26,7 +26,7 @@ JSON spec 형태 (known_plants/상추.json 참고):
                 "event_prompts": {"NO_EVENTS": "...", "INCREASED": "...", "DECREASED": "..."},
                 "default_dialog": {"STABLE": "...", "NO_EVENTS": "...", "INCREASED": "...", "DECREASED": "..."}
             },
-            "trend_machine": {
+            "trend_machine": {  # 선택: 없으면 추세 머신 없이 leaf_count만 조립된다
                 "window": 7, "mad_k": 3.5, "growth_eps": 0.001, "decline_eps": 0.001,
                 "state_prompts": {"GROWING": "...", ...},
                 "event_prompts": {"NO_EVENTS": "...", "STAGNANT_TO_GROWING": "...", ...},
@@ -43,6 +43,10 @@ JSON spec 형태 (known_plants/상추.json 참고):
         }
     }
 }
+
+종 파일 이름(known_plants/<이름>.json)이 build_known_persona()의 로드 키이고, "name" 필드는
+PlantAI가 LLM 요청에 넘기는 종 이름이다. 같은 종이라도 구성이 다른 파일은 서로 다른 로드 키와
+"name"을 가져서 LLM 쪽에서도 구분된다.
 
 state_prompts/event_prompts는 LLM에게 상황을 설명해주기 위한 프롬프트 조각이고,
 default_dialog는 LLM에 접속할 수 없을 때 대신 사용자에게 그대로 보여줄, 식물
@@ -69,7 +73,7 @@ engine "type"별 조립 방법은 _ENGINE_BUILDERS에 등록되어 있다. 지�
 
 import json
 from pathlib import Path
-from typing import Callable, Dict, Union
+from typing import Callable, Dict, Optional, Union
 
 from planta_gochi.persona.persona import Persona
 from planta_gochi.persona.state_engine import (
@@ -92,13 +96,14 @@ from planta_gochi.sensory import DiseaseAnalyzer, LeafAnalyzer
 
 KNOWN_PLANTS_DIR = Path(__file__).parent / "known_plants"
 
-_ENGINE_BUILDERS: Dict[str, Callable[[dict], StateEngine]] = {}
+_ENGINE_BUILDERS: Dict[str, Callable[[dict, Optional[LeafAnalyzer], Optional[DiseaseAnalyzer]], StateEngine]] = {}
 
 
 def register_engine_builder(engine_type: str):
-    """spec["type"] == engine_type인 sensor spec을 StateEngine으로 조립하는 함수를 등록한다."""
+    """spec["type"] == engine_type인 sensor spec을 StateEngine으로 조립하는 함수를 등록한다.
+    등록되는 함수는 (spec, leaf_analyzer, disease_analyzer)를 받는다 — 필요 없는 타입은 무시한다."""
 
-    def decorator(builder_fn: Callable[[dict], StateEngine]):
+    def decorator(builder_fn: Callable[[dict, Optional[LeafAnalyzer], Optional[DiseaseAnalyzer]], StateEngine]):
         _ENGINE_BUILDERS[engine_type] = builder_fn
         return builder_fn
 
@@ -137,7 +142,7 @@ def _validate_dialog_coverage(state_prompts: dict, event_prompts: dict, default_
 
 
 @register_engine_builder("linear")
-def build_linear_state_machine(spec: dict) -> LinearStateMachine:
+def build_linear_state_machine(spec: dict, leaf_analyzer=None, disease_analyzer=None) -> LinearStateMachine:
     thresholds = spec["thresholds"]
     state_prompts = _parse_enum_dict(spec["state_prompts"], LinearState)
     event_prompts = _parse_enum_dict(spec["event_prompts"], LinearEvents)
@@ -187,8 +192,7 @@ def _build_discrete_count_machine(spec: dict) -> DiscreteCountMachine:
 
 
 @register_engine_builder("growth")
-def build_growth_state_machine(spec: dict) -> GrowthStateMachine:
-    leaf_analyzer_spec = spec.get("leaf_analyzer", {})
+def build_growth_state_machine(spec: dict, leaf_analyzer=None, disease_analyzer=None) -> GrowthStateMachine:
     count_machine = _build_discrete_count_machine(spec["count_machine"])
     canopy_machine = None
     leaf_size_machine = None
@@ -202,18 +206,17 @@ def build_growth_state_machine(spec: dict) -> GrowthStateMachine:
         count_machine=count_machine,
         canopy_machine=canopy_machine,
         leaf_size_machine=leaf_size_machine,
-        leaf_analyzer=LeafAnalyzer(**leaf_analyzer_spec),
+        leaf_analyzer=leaf_analyzer if leaf_analyzer is not None else LeafAnalyzer(**spec.get("leaf_analyzer", {})),
     )
 
 
 @register_engine_builder("disease")
-def build_disease_state_machine(spec: dict) -> DiseaseStateMachine:
+def build_disease_state_machine(spec: dict, leaf_analyzer=None, disease_analyzer=None) -> DiseaseStateMachine:
     state_prompts = _parse_enum_dict(spec["state_prompts"], DiseaseState)
     event_prompts = _parse_enum_dict(spec["event_prompts"], DiseaseEvents)
     default_dialog = _parse_state_or_event_dict(spec["default_dialog"], DiseaseState, DiseaseEvents)
     _validate_dialog_coverage(state_prompts, event_prompts, default_dialog)
 
-    disease_analyzer_spec = spec.get("disease_analyzer", {})
     kwargs = {}
     if "confirm_streak" in spec:
         kwargs["confirm_streak"] = spec["confirm_streak"]
@@ -222,12 +225,16 @@ def build_disease_state_machine(spec: dict) -> DiseaseStateMachine:
         state_prompts=state_prompts,
         event_prompts=event_prompts,
         default_dialog=default_dialog,
-        disease_analyzer=DiseaseAnalyzer(**disease_analyzer_spec),
+        disease_analyzer=disease_analyzer if disease_analyzer is not None else DiseaseAnalyzer(**spec.get("disease_analyzer", {})),
         **kwargs,
     )
 
 
-def build_engine(sensor_spec: dict) -> StateEngine:
+def build_engine(
+    sensor_spec: dict,
+    leaf_analyzer: Optional[LeafAnalyzer] = None,
+    disease_analyzer: Optional[DiseaseAnalyzer] = None,
+) -> StateEngine:
     engine_type = sensor_spec.get("type", "linear")
     try:
         builder_fn = _ENGINE_BUILDERS[engine_type]
@@ -236,26 +243,44 @@ def build_engine(sensor_spec: dict) -> StateEngine:
             f"알 수 없는 state machine 타입: {engine_type!r} "
             f"(등록된 타입: {sorted(_ENGINE_BUILDERS)})"
         )
-    return builder_fn(sensor_spec)
+    return builder_fn(sensor_spec, leaf_analyzer, disease_analyzer)
 
 
-def build_persona_from_spec(plant_spec: dict) -> Persona:
-    """{"name": ..., "sensors": {...}} 형태의 dict로부터 Persona를 만든다."""
+def build_persona_from_spec(
+    plant_spec: dict,
+    leaf_analyzer: Optional[LeafAnalyzer] = None,
+    disease_analyzer: Optional[DiseaseAnalyzer] = None,
+) -> Persona:
+    """{"name": ..., "sensors": {...}} 형태의 dict로부터 Persona를 만든다.
+
+    leaf_analyzer/disease_analyzer를 넘기면 growth/disease 엔진이 그 인스턴스를 그대로
+    쓴다(여러 persona가 모델 하나를 공유할 때 재로딩을 막기 위함). 넘기지 않으면 기존처럼
+    sensor spec의 설정으로 엔진마다 새로 만든다. 주입된 인스턴스가 있으면 spec의
+    "leaf_analyzer"/"disease_analyzer" 설정은 무시된다.
+    """
     engines = {
-        sensor_name: build_engine(sensor_spec)
+        sensor_name: build_engine(sensor_spec, leaf_analyzer, disease_analyzer)
         for sensor_name, sensor_spec in plant_spec["sensors"].items()
     }
     return Persona(name=plant_spec["name"], engines=engines)
 
 
-def build_persona_from_json(json_path: Union[str, Path]) -> Persona:
+def build_persona_from_json(
+    json_path: Union[str, Path],
+    leaf_analyzer: Optional[LeafAnalyzer] = None,
+    disease_analyzer: Optional[DiseaseAnalyzer] = None,
+) -> Persona:
     """JSON 파일 경로로부터 Persona를 만든다."""
     with Path(json_path).open(encoding="utf-8") as f:
         plant_spec = json.load(f)
-    return build_persona_from_spec(plant_spec)
+    return build_persona_from_spec(plant_spec, leaf_analyzer=leaf_analyzer, disease_analyzer=disease_analyzer)
 
 
-def build_known_persona(plant_name: str) -> Persona:
+def build_known_persona(
+    plant_name: str,
+    leaf_analyzer: Optional[LeafAnalyzer] = None,
+    disease_analyzer: Optional[DiseaseAnalyzer] = None,
+) -> Persona:
     """known_plants/ 디렉토리에 미리 등록된 종 이름(예: "상추")으로부터 Persona를 만든다."""
     json_path = KNOWN_PLANTS_DIR / f"{plant_name}.json"
     if not json_path.exists():
@@ -263,11 +288,11 @@ def build_known_persona(plant_name: str) -> Persona:
         raise FileNotFoundError(
             f"등록되지 않은 식물 종: {plant_name!r} (등록된 종: {known})"
         )
-    return build_persona_from_json(json_path)
+    return build_persona_from_json(json_path, leaf_analyzer=leaf_analyzer, disease_analyzer=disease_analyzer)
 
 
 def build_lettuce_persona() -> Persona:
-    """온도/습도 linear state machine과 growth(vision) state machine을 가진 "상추" persona 예시."""
+    """known_plants/상추.json으로 만든 persona 예시."""
     return build_known_persona("상추")
 
 

@@ -4,6 +4,9 @@
 (OpenRouter 호출)을 묶어서, 센서 값을 넣으면 최종적으로 사용자에게 보여줄 짧은 대사
 목록, mood(표정), 성장 단계까지 만들어주는 클래스입니다.
 
+종 선택(`"상추"` / `"상추_trend"`)과 여러 persona가 analyzer 모델을 공유하는 방법은
+[`persona_builder.md`](persona_builder.md)에 있습니다.
+
 ## 기본 사용법
 
 ```python
