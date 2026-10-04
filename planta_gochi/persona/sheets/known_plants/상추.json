@@ -114,7 +114,7 @@
       },
       "default_dialog": {
         "VALUE_CRITICAL_LOW": "공기가 너무 건조해요... 저 바짝 말라버릴 것 같아요",
-        "VALUE_LOW": "공기가 좀 건조한 것 같아요...",
+        "VALUE_LOW": "공기가 좀 건조한 것 같아요",
         "VALUE_MID": "밖에 습도는 딱이네요. 잘 유지 부탁드릴게요.",
         "VALUE_HIGH": "좀 눅눅해요... 뿌리가 물러질까 걱정돼요",
         "VALUE_CRITICAL_HIGH": "너무 눅눅해요! 뿌리가 썩을까 봐 무서워요, 환기 좀 시켜주세요",
