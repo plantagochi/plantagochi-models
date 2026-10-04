@@ -79,6 +79,13 @@ persona라면 `"image"` 키는 조용히 무시됩니다.
    경우 fallback 시 여러 개의 짧은 글로 나뉘어 들어갑니다.
 6. `TrendStateMachine`이 아직 추세를 판단할 데이터가 부족한 동안(`INSUFFICIENT_DATA`)은
    애초에 `prompt`/`default_dialog`가 빈 `list`라 아무 메시지도 추가되지 않습니다.
+7. **상태이상이 걸려 있으면 그 상태이상을 일으킨 센서/질병의 메시지만 돌려줍니다.**
+   상태이상 문구와 일반 문구는 어조 차이가 커서 섞지 않습니다. 그래서 `extract_status_effects`
+   기준으로 상태이상이 있는 센서/질병만 LLM 요청에도 들어가고, 최종 `list[str]`에도 그
+   센서들의 메시지만 남습니다. 예를 들어 온도가 극단 고온이고 습도가 정상이면 온도 메시지
+   하나만 나옵니다. 상태이상이 하나도 없으면 기존처럼 모든 센서의 메시지가 나옵니다.
+   이 필터는 `speak()`의 반환값과 LLM 요청에만 적용되고, `get_mood()`/`get_growth_stage()`/
+   `get_status_effect()`가 읽는 마지막 결과에는 전체 센서 결과가 그대로 남습니다.
 
 ## get_mood() / get_growth_stage() / get_status_effect() — 표정/성장 단계/상태이상 뽑기
 

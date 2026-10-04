@@ -46,9 +46,24 @@ class PlantAI:
         최종적으로 사용자에게 보여줄 것들은 짧은 글이어야 하므로, 여러 줄을 하나로 뭉쳐서
         길게 만들지 않는다. INSUFFICIENT_DATA처럼 아직 할 말이 없는 신호는 애초에
         default_dialog가 빈 list라 자동으로 아무것도 추가되지 않는다.
+
+        상태이상(extract_status_effects 기준)이 하나라도 걸려 있으면, 그 상태이상을 일으킨
+        센서/질병의 메시지만 LLM에 넘기고 돌려준다 — 상태이상 문구와 일반 문구는 어조 차이가
+        커서 섞지 않는다. 이때 LLM 요청에도 해당 센서만 들어간다.
         """
         self._last_result = self.persona.update(sensor_values)
         results = self._last_result
+
+        # 상태이상이 걸려 있으면 그 상태이상을 일으킨 센서/질병의 메시지만 돌려준다
+        # (일반 메시지와 어조 차이가 커서 섞으면 안 되므로). _last_result에는 전체 결과를 그대로 둔다.
+        status_results = {
+            sensor_name: result
+            for sensor_name, result in results.items()
+            if extract_status_effects({sensor_name: result})
+        }
+        #is status_effect empty?
+        if status_results: #안비어 있다면 last_result로 대체해버림
+            results = status_results
 
         situations = {sensor_name: result["prompt"] for sensor_name, result in results.items()}
         reply = self.llm.ask_batch(self.persona.name, situations)
